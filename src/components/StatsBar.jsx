@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-export default function StatsBar({ registros }) {
+export default function StatsBar({ registros,onClick }) {
   const stats = useMemo(() => {
     const total = registros.reduce((sum, r) => sum + (Number(r.monto) || 0), 0);
     const count = registros.length;
@@ -16,6 +16,10 @@ export default function StatsBar({ registros }) {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
+  }
+  const handleCreate=()=>{
+    console.log("Mi boton nuevo esta funcionando")
+    onClick();
   }
 
   return (
@@ -44,6 +48,13 @@ export default function StatsBar({ registros }) {
           {formatCurrency(stats.avg)}
         </p>
       </div> */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <button className="inline-flex items-center px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-medium
+                         hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
+                         disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm" onClick={()=>handleCreate()}>
+                          Agregar
+        </button>
+      </div>
     </div>
   );
 }

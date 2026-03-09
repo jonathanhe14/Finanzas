@@ -36,6 +36,39 @@ export function useRegistros() {
     }
   }
 
+  async function createRegistro({
+    nombre,
+    monto,
+    categoria,
+    metodo,
+    descripcion,
+  }) {
+    console.log(nombre,"nombre desde el use")
+    try {
+      const { data, error } = await supabase
+        .from("registros")
+        .insert({
+          nombre,
+          monto,
+          categoria,
+          metodo,
+          descripcion,
+        })
+        .select("*")
+        .single();
+      setLoading(false);
+      if (error) {
+        setError(error.message);
+        return { data: null, error };
+      }
+      return data;
+    } catch (err) {
+      setError(err.message || "Error al crear un registro");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function updateRegistro(id, datos) {
     setLoading(true);
     setError(null);
@@ -57,6 +90,10 @@ export function useRegistros() {
       setError(error.message);
       return { data: null, error };
     }
+    console.log(data);
+    setRegistros((prev) =>
+      prev.map((reg) => (reg.id === data[0].id ? data[0] : reg)),
+    );
     return { data: data[0], error: null };
   }
 
@@ -124,5 +161,6 @@ export function useRegistros() {
     refetch: fetchRegistros,
     deleteRegistro,
     updateRegistro,
+    createRegistro,
   };
 }

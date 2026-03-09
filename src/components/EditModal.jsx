@@ -13,36 +13,36 @@ import { InputField } from "./InputField";
 import { SelectField } from "./SelectField";
 import ErrorState from "./ErrorState";
 
-
 //Establecemos las categorias que vamos a utilizar
 const categorias = [
-  { value: "alimentacion", label: "🛒 Alimentación" },
-  { value: "transporte", label: "🚗 Transporte" },
-  { value: "entretenimiento", label: "🎬 Entretenimiento" },
-  { value: "salud", label: "💊 Salud" },
-  { value: "educacion", label: "📚 Educación" },
-  { value: "ropa", label: "👕 Ropa" },
-  { value: "hogar", label: "🏠 Hogar" },
-  { value: "otros", label: "📦 Otros" },
-  { value: "gastos_fijos", label: "💲 Gastos Fijos" },
+  { value: "🛒 Alimentación", label: "🛒 Alimentación" },
+  { value: "🚗 Transporte", label: "🚗 Transporte" },
+  { value: "🛵 Moto", label: "🛵 Moto" },
+  { value: "👷🏼‍♂️ Gastos Trabajo", label: "👷🏼‍♂️ Gastos Trabajo" },
+  { value: "🎬 Entretenimiento", label: "🎬 Entretenimiento" },
+  { value: "💊 Salud", label: "💊 Salud" },
+  { value: "📚 Educación", label: "📚 Educación" },
+  { value: "👕 Ropa", label: "👕 Ropa" },
+  { value: "🏠 Hogar", label: "🏠 Hogar" },
+  { value: "📦 Otros", label: "📦 Otros" },
+  { value: "💲 Gastos Fijos", label: "💲 Gastos Fijos" },
 ];
 
 //Establecemos los metodos que vamos a utilizar
 const metodos = [
-  { value: "efectivo", label: "💵 Efectivo" },
-  { value: "tarjeta_wink", label: "💳 Tarjeta Wink" },
-  { value: "tarjeta_credito", label: "💳 Tarjeta de Crédito" },
-  { value: "bac", label: "💳 Tajeta BAC" },
+  { value: "💵 Efectivo", label: "💵 Efectivo" },
+  { value: "💳 Tarjeta Wink", label: "💳 Tarjeta Wink" },
+  { value: "💳 Tarjeta de Crédito", label: "💳 Tarjeta de Crédito" },
+  { value: "💳 Tajeta BAC", label: "💳 Tajeta BAC" },
 ];
 
-export const EditModal = ({ registro, isOpen, onClose, onSave }) => {
-
-
+export const EditModal = ({ registro, isOpen, onClose, onSave, onCreate }) => {
   const [formData, setFormData] = useState({
     nombre: "",
     monto: "",
     categoria: "",
     metodo: "",
+    descripcion: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -57,6 +57,7 @@ export const EditModal = ({ registro, isOpen, onClose, onSave }) => {
         monto: registro.monto || "",
         categoria: registro.categoria || "",
         metodo: registro.metodo || "",
+        descripcion: registro.descripcion || "",
       });
       setErrors({});
       setShowSuccess(false);
@@ -91,26 +92,26 @@ export const EditModal = ({ registro, isOpen, onClose, onSave }) => {
   };
 
   const handleSubmit = async (e) => {
-    console.log("Hola")
     e.preventDefault();
     const newErrors = validate();
     if (Object.keys(newErrors).length > 0) {
+      console.log(formData);
+      if (formData.id) {
+        console.log("Es Actualizacion");
+        onSave(registro.id, formData);
+      } else {
+        console.log("Es creacion");
+        onCreate(formData);
+      }
       setErrors(newErrors);
-      onSave(registro.id,formData)
       return;
     }
-    TODO: //Ver para que sirven estas lineas de abajo
     setIsLoading(true);
-    // Simular llamada a API
-
     setIsLoading(false);
     setShowSuccess(true);
-      
-   };
+  };
 
-    if (!isOpen) return null;
-
-
+  if (!isOpen) return null;
 
   return (
     // Overlay
@@ -127,13 +128,10 @@ export const EditModal = ({ registro, isOpen, onClose, onSave }) => {
         animate-in zoom-in-95 fade-in duration-200"
       >
         {/* ── Header ── */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-5">
+        <div className="bg-gradient-to-r from-blue-900 to-blue-700 px-6 py-5">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-white">Editar Registro</h2>
-              <p className="text-indigo-200 text-sm mt-0.5">
-                ID #{registro?.id} · Modifica los campos necesarios
-              </p>
             </div>
             <button
               onClick={onClose}
@@ -229,8 +227,8 @@ export const EditModal = ({ registro, isOpen, onClose, onSave }) => {
               type="submit"
               disabled={isLoading || showSuccess}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
-                bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-medium
-                hover:from-indigo-700 hover:to-purple-700 transition-all duration-200
+                bg-gradient-to-r from-blue-900 to-blue-700 text-white text-sm font-medium
+                hover:from-blue-700 hover:to-blue-700 transition-all duration-200
                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2
                 disabled:opacity-70 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
             >
