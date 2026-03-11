@@ -1,6 +1,6 @@
 // Importa un hook personalizado que encapsula la lógica de obtención de datos
 // (probablemente desde Supabase), además del estado de carga/errores y filtros.
-import { useRegistros } from "../hooks/useRegistros";
+import {useRegistros} from "../features/dashboard/hooks/useRegistros";
 // Importa componentes de UI (presentacionales) separados por responsabilidad.
 import Filters from "../components/Filters"; // UI para filtrar por categoría y fecha
 import RegistrosTable from "../components/RegistrosTable"; // Tabla para listar los registros

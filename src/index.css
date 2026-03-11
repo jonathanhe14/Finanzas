@@ -4,7 +4,30 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-gray-50 text-gray-900 antialiased;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  body { background: #F7F6F3; font-family: 'Outfit', sans-serif; }
+
+@layer components {
+
+  .pbar {
+    height: 5px;
+    border-radius: 9999px;
+    background: #E6E4DF;
+    overflow: hidden;
+  }
+
+  .pfill {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 1s cubic-bezier(.4,0,.2,1);
+  }
+
+  .kpi-card {
+    transition: box-shadow .2s, transform .2s;
+  }
+
+  .kpi-card:hover {
+    box-shadow: 0 8px 24px -4px rgba(0,0,0,0.09);
+    transform: translateY(-1px);
+  }
+
 }
