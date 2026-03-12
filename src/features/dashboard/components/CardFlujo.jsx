@@ -1,6 +1,6 @@
 import {TrendingDown, TrendingUp} from "lucide-react";
 
-export const Card = ({trending,nombre,saldo,porcentaje,descripcion}) => {
+export const CardFlujo = ({trending,nombre,saldo,porcentaje,descripcion}) => {
 
   return (
     <div className="kpi-card bg-white border border-border rounded-2xl p-5 shadow-card animate-fade-up overflow-hidden relative">

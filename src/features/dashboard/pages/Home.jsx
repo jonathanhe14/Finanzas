@@ -1,10 +1,14 @@
-import {Card} from "../components/Card";
+import { CardFlujo } from "../components/CardFlujo";
 import { useState, useEffect } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { useAccunts } from "../hooks/useAccounts";
 import { Sidebar } from "../../../components/Sidebar";
 import { Plus, Search, ChevronRight, ChevronLeft } from "lucide-react";
+import { CardBalance } from "../components/CardBalance";
+import { CardUltimosMovimientos } from "../components/CardUltimosMovimientos";
+import { CardGastosCategoria } from "../components/CardGastosCategoria";
+import {CardPresupuesto} from "../components/CardPresupuesto";
 
 const handleLogout = () => {
   console.log("Usuario ha cerrado sesión");
@@ -50,6 +54,23 @@ function Home() {
       setStatus("error");
     }
   };
+  const ultimosMovimientos = [
+    {
+      nombre: "Compra en Supermercado",
+      fecha: "2026-03-28",
+      tipo: "gasto",
+      monto: 15000,
+    },
+    { nombre: "Salario", fecha: "2026-03-25", tipo: "ingreso", monto: 350000 },
+    {
+      nombre: "Transferencia a Ahorros",
+      fecha: "2026-03-20",
+      tipo: "transferencia",
+      monto: 2000,
+    },
+    { nombre: "Comida Uber", fecha: "2026-03-28", tipo: "gasto", monto: 5500 },
+    { nombre: "Audifonos", fecha: "2026-03-28", tipo: "gasto", monto: 30000 },
+  ];
 
   return (
     <div className="min-h-screen flex text-ink text-sm w-full">
@@ -90,17 +111,52 @@ function Home() {
         >
           {/* Aqui dentro van los cards */}
           <div className="col-span-3 grid grid-cols-4 gap-3">
-            <Card trending={"up"} nombre="Gasto del mes" saldo={3450.00} porcentaje={8.5} descripcion="vs mes pasado" />
-            <Card trending={"down"} nombre="Ingreso del mes" saldo={5000.00} porcentaje={-2.3} descripcion="vs mes pasado" />
+            <CardFlujo
+              trending={"up"}
+              nombre="Gasto del mes"
+              saldo={3450.0}
+              porcentaje={8.5}
+              descripcion="vs mes pasado"
+            />
+            <CardFlujo
+              trending={"down"}
+              nombre="Ingreso del mes"
+              saldo={5000.0}
+              porcentaje={-2.3}
+              descripcion="vs mes pasado"
+            />
+            <CardBalance
+              nombre="Balance Disponible"
+              saldo={12500.0}
+              tipo="ASSET"
+              detalles="Disponible para gastar"
+            />
+            <CardBalance
+              nombre="Deuda de Tarjeta"
+              saldo={3450.0}
+              tipo="LIABILITY"
+              detalles="Proximo pago 15 de Abril"
+            />
           </div>
+          <CardUltimosMovimientos movimientos={ultimosMovimientos} />
+          <CardGastosCategoria
+            categorias={{
+              Alimentación: 450,
+              Transporte: 200,
+              Entretenimiento: 150,
+              Salud: 100,
+              Ropa: 80,
+            }}
+          />
+          <CardPresupuesto
+            presupuestos={[
+              { categoria: "Alimentación", gastado: 320, presupuestado: 450 },
+              { categoria: "Transporte", gastado: 210, presupuestado: 200 },
+              { categoria: "Entretenimiento", gastado: 80, presupuestado: 100 },
+              { categoria: "Salud", gastado: 175, presupuestado: 180 },
+            ]}
+          />
         </div>
-
-        {/* <button
-        className=" w-20 h-20 rounded-xl bg-slate-800/50 border border-white/10 flex items-center justify-center text-black hover:text-white hover:border-white/20 transition-all duration-300 cursor-pointer"
-        onClick={handleProbar}
-      >
-        Probar cosas
-      </button> */}
       </div>
     </div>
   );
