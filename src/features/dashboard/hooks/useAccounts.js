@@ -1,8 +1,6 @@
-
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from "../../../lib/supabaseClient";
 
 export function useAccunts() {
-
   async function getGastosTotalesMes() {
     const { data, error } = await supabase
       .from("v_postings_enriched")
@@ -19,7 +17,7 @@ export function useAccunts() {
     return { total, error };
   }
 
-  async function getAccountIdsByNames(accountsNames) {
+  async function addJournalEntry(accountsNames, movement) {
     // 1) Trae IDs de cuentas del usuario logueado
     const { data: accounts, error: accErr } = await supabase
       .from("accounts")
@@ -28,40 +26,46 @@ export function useAccunts() {
 
     if (accErr) throw accErr;
 
-    const wink = accounts.find((a) => a.name === "Wink");
-    const comida = accounts.find((a) => a.name === "Comida");
-    console.log("wink:", wink);
-    console.log("categoria:", comida);
+    const isExpense = movement.type === "gasto";
 
-    if (!wink || !comida) {
-      throw new Error(
-        "Faltan cuentas Wink o Comida (y deben tener user_id correcto)",
-      );
+    const accountOne = accounts.find(
+      (a) => a.name === accountsNames[isExpense ? 1 : 0],
+    );
+    const accountTwo = accounts.find(
+      (a) => a.name === accountsNames[isExpense ? 0 : 1],
+    );
+    console.log("Cuentas encontradas:", accountOne, accountTwo);
+    if (!accountOne || !accountTwo) {
+      throw new Error("No se encontraron las cuentas especificadas");
     }
+    console.log()
+    const [debitTwo, creditTwo, debitOne, creditOne] =
+      movement.type === "ingreso" ? [0, movement.amount, movement.amount, 0] : [movement.amount, 0, 0, movement.amount];
+     
 
     // 2) Arma el payload (debe quedar balanceado)
     const payload = {
-      entry_date: "2026-03-02",
-      description: "Comida",
-      merchant_id: "",
-      status: "CLEARED",
-      currency_code: "CRC",
+      entry_date: movement.date,
+      description: movement.description,
+      merchant_id: movement.merchant_id,
+      status: movement.status,
+      currency_code: movement.currency_code,
       postings: [
         {
-          account_id: String(comida.id),
-          debit: 12500,
-          credit: 0,
-          memo: "Gasto comida",
+          account_id: String(accountTwo.id),
+          debit: debitTwo,
+          credit: creditTwo,
+          memo: movement.memo,
         },
         {
-          account_id: String(wink.id),
-          debit: 0,
-          credit: 12500,
-          memo: "Pago con Wink",
+          account_id: String(accountOne.id),
+          debit: debitOne,
+          credit: creditOne,
+          memo: movement.memo,
         },
       ],
     };
-
+    console.log("Payload para nueva entrada:", payload);
     // 3) RPC
     const { data, error } = await supabase.rpc(
       "create_journal_entry_with_postings",
@@ -74,5 +78,5 @@ export function useAccunts() {
 
     return data; // entry_id
   }
-  return { getAccountIdsByNames, getGastosTotalesMes };
+  return { addJournalEntry, getGastosTotalesMes };
 }

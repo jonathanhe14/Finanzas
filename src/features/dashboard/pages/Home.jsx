@@ -9,6 +9,7 @@ import { CardBalance } from "../components/CardBalance";
 import { CardUltimosMovimientos } from "../components/CardUltimosMovimientos";
 import { CardGastosCategoria } from "../components/CardGastosCategoria";
 import {CardPresupuesto} from "../components/CardPresupuesto";
+import ModalNuevoMovimiento from "../components/ModalNuevoMovimiento";
 
 const handleLogout = () => {
   console.log("Usuario ha cerrado sesión");
@@ -17,10 +18,12 @@ const handleLogout = () => {
 
 function Home() {
   const [status, setStatus] = useState("idle");
+  //Comprobar luego
   const [entryId, setEntryId] = useState(null);
   const [error, setError] = useState(null);
-  const { getAccountIdsByNames, getGastosTotalesMes } = useAccunts();
+  const { addJournalEntry, getGastosTotalesMes } = useAccunts();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openModal, setOpenModal] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -38,14 +41,23 @@ function Home() {
     });
   }, [navigate]);
 
-  const handleProbar = async () => {
-    setStatus("loading");
-    setError(null);
-    setEntryId(null);
-    const accountNames = ["Wink", "Comida"];
+
+
+  async function asyncHandleSave (movement) {
+    const newMovement ={
+      date: "2026-03-28",
+      description: movement.nombre,
+      merchant_id: null,
+      status: "CLEARED",
+      currency_code: "CRC",
+      type: movement.tipo,
+      amount: movement.monto,
+      memo: movement.nombre + " - " + movement.fecha,
+    }
+    const accountNames = [movement.cuentaDestino, movement.cuentaOrigen];
     try {
       console.log("Intentando crear entrada con cuentas:", accountNames);
-      const newEntryId = await getAccountIdsByNames(accountNames);
+      const newEntryId = await addJournalEntry(accountNames,newMovement);
       setEntryId(newEntryId);
       setStatus("success");
       console.log("Entrada creada con ID:", newEntryId);
@@ -53,7 +65,8 @@ function Home() {
       setError(e.message || String(e));
       setStatus("error");
     }
-  };
+    
+  }
   const ultimosMovimientos = [
     {
       nombre: "Compra en Supermercado",
@@ -96,10 +109,11 @@ function Home() {
               Buscar…
             </div>
 
-            <button className="bg-ink text-white text-[12px] font-medium rounded-xl px-4 py-[7px] flex items-center gap-1.5 hover:bg-ink/80 transition-colors shadow-sm">
-              <Plus className="w-3.5 h-3.5" color="white" />
+            <button onClick={()=>setOpenModal(true)} className="bg-ink text-white text-[12px] font-medium rounded-xl px-4 py-[7px] flex items-center gap-1.5 hover:bg-ink/80 transition-colors shadow-sm">
+              <Plus className="w-3.5 h-3.5" color="white"/>
               Nuevo movimiento
             </button>
+            
           </div>
         </header>
         <div
@@ -109,6 +123,7 @@ function Home() {
             gridTemplateRows: "auto auto auto",
           }}
         >
+          <ModalNuevoMovimiento isOpen={openModal} onClose={() => setOpenModal(false)} onSave={asyncHandleSave} />
           {/* Aqui dentro van los cards */}
           <div className="col-span-3 grid grid-cols-4 gap-3">
             <CardFlujo
