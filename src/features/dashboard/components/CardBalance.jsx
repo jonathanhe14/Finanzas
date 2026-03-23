@@ -5,9 +5,9 @@ export function CardBalance({ nombre, saldo, tipo, detalles }) {
     <div className="kpi-card bg-white border border-border rounded-2xl p-5 shadow-card animate-fade-up d2 overflow-hidden">
       <div className="flex items-start justify-between mb-4">
         <div className={`w-9 h-9 rounded-xl ${tipo === "ASSET" ? "bg-green-100": "bg-amber-100"} flex items-center justify-center`}>
-            {tipo === "ASSET" ? <Scale class="w-4 h-4 text-green-600" /> : <CreditCard class="w-4 h-4 text-amber-600" />}
+            {tipo === "ASSET" ? <Scale className="w-4 h-4 text-green-600" /> : <CreditCard className="w-4 h-4 text-amber-600" />}
         </div>
-        <span className={`text-[9px] font-semibold ${tipo ==="ASSET"? "text-green-600 bg-green-100":"text-ambre-600 bg-amber-100"} px-2 py-0.5 rounded-full uppercase tracking-wider`}>
+        <span className={`text-[9px] font-semibold ${tipo ==="ASSET"? "text-green-600 bg-green-100":"text-amber-600 bg-amber-100"} px-2 py-0.5 rounded-full uppercase tracking-wider`}>
           {tipo}
         </span>
       </div>

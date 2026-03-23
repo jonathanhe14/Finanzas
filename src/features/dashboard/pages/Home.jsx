@@ -8,8 +8,10 @@ import { Plus, Search, ChevronRight, ChevronLeft } from "lucide-react";
 import { CardBalance } from "../components/CardBalance";
 import { CardUltimosMovimientos } from "../components/CardUltimosMovimientos";
 import { CardGastosCategoria } from "../components/CardGastosCategoria";
-import {CardPresupuesto} from "../components/CardPresupuesto";
+import { CardPresupuesto } from "../components/CardPresupuesto";
 import ModalNuevoMovimiento from "../components/ModalNuevoMovimiento";
+import { useDashboardReport } from "../hooks/useDashboardReport";
+import { useRecentEntries } from "../hooks/useRecentEntries";
 
 const handleLogout = () => {
   console.log("Usuario ha cerrado sesión");
@@ -40,11 +42,12 @@ function Home() {
       }
     });
   }, [navigate]);
+  const { data: dashboardData, isLoading, isError } = useDashboardReport();
+  const { data: recentEntries = [] } = useRecentEntries();
 
 
-
-  async function asyncHandleSave (movement) {
-    const newMovement ={
+  async function asyncHandleSave(movement) {
+    const newMovement = {
       date: "2026-03-28",
       description: movement.nombre,
       merchant_id: null,
@@ -53,11 +56,11 @@ function Home() {
       type: movement.tipo,
       amount: movement.monto,
       memo: movement.nombre + " - " + movement.fecha,
-    }
+    };
     const accountNames = [movement.cuentaDestino, movement.cuentaOrigen];
     try {
       console.log("Intentando crear entrada con cuentas:", accountNames);
-      const newEntryId = await addJournalEntry(accountNames,newMovement);
+      const newEntryId = await addJournalEntry(accountNames, newMovement);
       setEntryId(newEntryId);
       setStatus("success");
       console.log("Entrada creada con ID:", newEntryId);
@@ -65,25 +68,7 @@ function Home() {
       setError(e.message || String(e));
       setStatus("error");
     }
-    
   }
-  const ultimosMovimientos = [
-    {
-      nombre: "Compra en Supermercado",
-      fecha: "2026-03-28",
-      tipo: "gasto",
-      monto: 15000,
-    },
-    { nombre: "Salario", fecha: "2026-03-25", tipo: "ingreso", monto: 350000 },
-    {
-      nombre: "Transferencia a Ahorros",
-      fecha: "2026-03-20",
-      tipo: "transferencia",
-      monto: 2000,
-    },
-    { nombre: "Comida Uber", fecha: "2026-03-28", tipo: "gasto", monto: 5500 },
-    { nombre: "Audifonos", fecha: "2026-03-28", tipo: "gasto", monto: 30000 },
-  ];
 
   return (
     <div className="min-h-screen flex text-ink text-sm w-full">
@@ -109,11 +94,13 @@ function Home() {
               Buscar…
             </div>
 
-            <button onClick={()=>setOpenModal(true)} className="bg-ink text-white text-[12px] font-medium rounded-xl px-4 py-[7px] flex items-center gap-1.5 hover:bg-ink/80 transition-colors shadow-sm">
-              <Plus className="w-3.5 h-3.5" color="white"/>
+            <button
+              onClick={() => setOpenModal(true)}
+              className="bg-ink text-white text-[12px] font-medium rounded-xl px-4 py-[7px] flex items-center gap-1.5 hover:bg-ink/80 transition-colors shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" color="white" />
               Nuevo movimiento
             </button>
-            
           </div>
         </header>
         <div
@@ -123,45 +110,43 @@ function Home() {
             gridTemplateRows: "auto auto auto",
           }}
         >
-          <ModalNuevoMovimiento isOpen={openModal} onClose={() => setOpenModal(false)} onSave={asyncHandleSave} />
+          <ModalNuevoMovimiento
+            isOpen={openModal}
+            onClose={() => setOpenModal(false)}
+            onSave={asyncHandleSave}
+          />
           {/* Aqui dentro van los cards */}
           <div className="col-span-3 grid grid-cols-4 gap-3">
             <CardFlujo
-              trending={"up"}
+              trending={"down"}
               nombre="Gasto del mes"
-              saldo={3450.0}
-              porcentaje={8.5}
+              saldo={dashboardData?.expense_total ?? 0}
+              porcentaje={0}
               descripcion="vs mes pasado"
             />
             <CardFlujo
-              trending={"down"}
+              trending={"up"}
               nombre="Ingreso del mes"
-              saldo={5000.0}
-              porcentaje={-2.3}
+              saldo={dashboardData?.income_total ?? 0}
+              porcentaje={0}
               descripcion="vs mes pasado"
             />
             <CardBalance
               nombre="Balance Disponible"
-              saldo={12500.0}
+              saldo={dashboardData?.asset_balance ?? 0}
               tipo="ASSET"
               detalles="Disponible para gastar"
             />
             <CardBalance
               nombre="Deuda de Tarjeta"
-              saldo={3450.0}
+              saldo={dashboardData?.liability_balance ?? 0}
               tipo="LIABILITY"
               detalles="Proximo pago 15 de Abril"
             />
           </div>
-          <CardUltimosMovimientos movimientos={ultimosMovimientos} />
+          <CardUltimosMovimientos movimientos={recentEntries} />
           <CardGastosCategoria
-            categorias={{
-              Alimentación: 450,
-              Transporte: 200,
-              Entretenimiento: 150,
-              Salud: 100,
-              Ropa: 80,
-            }}
+            categorias={dashboardData?.expense_by_category ?? []}
           />
           <CardPresupuesto
             presupuestos={[

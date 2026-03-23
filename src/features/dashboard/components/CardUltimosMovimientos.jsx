@@ -24,7 +24,7 @@ const TIPO_CONFIG = {
   },
 };
 
-export function CardUltimosMovimientos({ movimientos}) {
+export function CardUltimosMovimientos({ movimientos }) {
   return (
     <div
       className="bg-white border border-border rounded-2xl shadow-card animate-fade-up d1 flex flex-col overflow-hidden"
@@ -47,20 +47,31 @@ export function CardUltimosMovimientos({ movimientos}) {
               key={i}
               className="flex items-center gap-3 px-5 py-3 hover:bg-surface/60 transition-colors"
             >
-              <div className={`w-8 h-8 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
+              <div
+                className={`w-8 h-8 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}
+              >
                 <Icon size={15} className={color} />
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="text-[12px] font-medium truncate">{mov.nombre}</div>
-                <div className="text-[10px] text-muted mt-0.5">{mov.fecha}</div>
+                <div className="text-[12px] font-medium truncate">
+                  {mov.merchant_name ?? mov.description}
+                </div>
+                <div className="text-[10px] text-muted mt-0.5">
+                  {mov.entry_date}
+                </div>
               </div>
 
               <div className="flex flex-col items-end gap-1">
                 <span className={`font-mono text-[12px] font-medium ${color}`}>
-                  ${mov.monto.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}
+                  $
+                  {Number(mov.amount)
+                    .toFixed(2)
+                    .replace(/\d(?=(\d{3})+\.)/g, "$&,")}
                 </span>
-                <span className={`text-[9px] px-1.5 py-0.5 rounded-md ${badge} font-semibold capitalize`}>
+                <span
+                  className={`text-[9px] px-1.5 py-0.5 rounded-md ${badge} font-semibold capitalize`}
+                >
                   {mov.tipo}
                 </span>
               </div>

@@ -17,6 +17,7 @@ export function useAccunts() {
     return { total, error };
   }
 
+
   async function addJournalEntry(accountsNames, movement) {
     // 1) Trae IDs de cuentas del usuario logueado
     const { data: accounts, error: accErr } = await supabase

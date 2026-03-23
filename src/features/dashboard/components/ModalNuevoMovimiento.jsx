@@ -1,29 +1,32 @@
 import { useState, useEffect, useCallback } from "react";
 
 // ── Static data ──────────────────────────────────────────────
+// Esto Deberia venir de la BD
 const ACCOUNTS = [
   { id: "Efectivo", label: "Efectivo", emoji: "💵" },
   { id: "Wink", label: "Wink", emoji: "📱" },
-  { id: "tarjeta", label: "Tarjeta", emoji: "💳" },
+  { id: "BAC", label: "Tarjeta", emoji: "💳" },
+  { id: "Wink Tarjeta", label: "Wink Tarjeta", emoji: "💳" },
 ];
 
+//Esto deberia venir de la BD
 const MERCHANTS = [
   { id: "walmart", name: "Walmart", sub: "Supermercado", emoji: "🛒" },
   { id: "spotify", name: "Spotify", sub: "Entretenimiento", emoji: "🎵" },
   { id: "uber", name: "Uber", sub: "Transporte", emoji: "🚗" },
 ];
 
+//Esto deberia venir de la BD, son los que tienen categoria Expense
 const CATEGORIES = [
-  "Comida",
+  "Alimentacion",
   "Transporte",
-  "Servicios",
-  "Personal",
   "Entretenimiento",
   "Salud",
-  "Otro",
+  "Gastos Fijos",
 ];
 
-const CATEGORIES_INGRESO = ["Salario", "Venta", "Regalo", "Otro"];
+//Esto deberia venir de la BD, son los que tienen categoria Income
+const CATEGORIES_INGRESO = ["Salario", "Extras"];
 
 const TYPE_META = {
   gasto: {

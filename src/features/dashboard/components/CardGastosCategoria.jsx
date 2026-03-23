@@ -1,8 +1,6 @@
-export function CardGastosCategoria({ categorias }) {
-  const total = Object.values(categorias).reduce(
-    (sum, monto) => sum + monto,
-    0,
-  );
+export function CardGastosCategoria({ categorias = [] }) {
+  const top5 = categorias.slice(0, 5);
+  const total = top5.reduce((sum, cat) => sum + Number(cat.total_expense), 0);
 
   const COLORES = [
     "bg-emerald-500",
@@ -28,8 +26,12 @@ export function CardGastosCategoria({ categorias }) {
       </div>
 
       <div className="space-y-3.5">
-        {Object.entries(categorias).map(([nombre, monto], i) => {
-          const porcentaje = Math.round((monto / total) * 100);
+        {top5.map((cat, i) => {
+          const porcentaje = Math.round(
+            (Number(cat.total_expense) / total) * 100,
+          );
+          const nombre = cat.account_name;
+          const monto = Number(cat.total_expense);
           const color = COLORES[i % COLORES.length];
 
           return (
