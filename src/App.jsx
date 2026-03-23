@@ -1,6 +1,6 @@
 import { Routes, Route, useNavigate } from "react-router-dom";
 import MovimientosA from "./components/MovimientosA";
-import Login from "./pages/login";
+import Login from "./pages/Login";
 import { useEffect } from "react";
 import { supabase } from "./lib/supabaseClient";
 import Home from "./features/dashboard/pages/Home";
