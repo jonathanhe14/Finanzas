@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import { useEffect } from "react";
 import { supabase } from "./lib/supabaseClient";
 import Home from "./features/dashboard/pages/Home";
+import Cuentas from "./features/accounts/pages/Cuentas";
 
 export default function App() {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/home" element={<Home />} />
         <Route path="/presupuesto" element={<Home />} />
-        <Route path="/cuentas" element={<Home />} />
+        <Route path="/cuentas" element={<Cuentas />} />
       </Routes>
     </>
   );

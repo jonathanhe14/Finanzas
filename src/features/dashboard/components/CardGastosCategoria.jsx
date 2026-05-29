@@ -1,71 +1,70 @@
-export function CardGastosCategoria({ categorias = [] }) {
-  const top5 = categorias.slice(0, 5);
-  const total = top5.reduce((sum, cat) => sum + Number(cat.total_expense), 0);
+import { PieChart } from "lucide-react";
+import { formatMoney } from "../../../lib/utils/money";
 
-  const COLORES = [
-    "bg-emerald-500",
-    "bg-blue-500",
-    "bg-violet-500",
-    "bg-amber-500",
-    "bg-rose-500",
-    "bg-cyan-500",
-    "bg-orange-500",
-    "bg-pink-500",
-  ];
+const PALETTE = [
+  "bg-danger text-danger",
+  "bg-warning text-warning",
+  "bg-info text-info",
+  "bg-success text-success",
+  "bg-brand2 text-brand2",
+  "bg-accent text-accent",
+];
+
+export function CardGastosCategoria({ categorias = [], currency = "CRC" }) {
+  const top6 = categorias.slice(0, 6);
+  const total = top6.reduce((sum, cat) => sum + Number(cat.total_expense), 0);
+  const isEmpty = top6.length === 0 || total === 0;
 
   return (
-    <div
-      className="bg-white border border-border rounded-2xl p-5 shadow-card animate-fade-up d4"
-      style={{ gridColumn: "1", gridRow: "2" }}
-    >
+    <div className="bg-surface border border-default rounded-2xl p-5 shadow-card animate-fade-up">
       <div className="flex items-center justify-between mb-4">
-        <span className="font-semibold text-[13px]">Gasto por categoría</span>
-        <a className="text-[11px] text-emerald-600 font-medium hover:underline cursor-pointer">
+        <span className="text-h3 text-primary">Gasto por categoría</span>
+        <a className="text-caption text-muted hover:text-accent font-medium cursor-pointer transition-colors duration-base">
           Detalle →
         </a>
       </div>
 
-      <div className="space-y-3.5">
-        {top5.map((cat, i) => {
-          const porcentaje = Math.round(
-            (Number(cat.total_expense) / total) * 100,
-          );
-          const nombre = cat.account_name;
-          const monto = Number(cat.total_expense);
-          const color = COLORES[i % COLORES.length];
+      {isEmpty ? (
+        <div className="flex flex-col items-center justify-center px-4 py-8 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-elevated flex items-center justify-center mb-3 ring-1 ring-inset ring-white/5">
+            <PieChart className="w-5 h-5 text-muted" strokeWidth={1.75} />
+          </div>
+          <p className="text-sm text-primary font-medium">Sin gastos este mes</p>
+          <p className="text-caption text-muted mt-1">
+            Aquí verás un desglose por categoría
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3.5">
+          {top6.map((cat, i) => {
+            const monto = Number(cat.total_expense);
+            const porcentaje = Math.round((monto / total) * 100);
+            const [bgClass] = PALETTE[i % PALETTE.length].split(" ");
 
-          return (
-            <div key={nombre}>
-              <div className="flex justify-between items-center mb-1.5">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`w-2 h-2 rounded-full ${color} flex-shrink-0`}
-                  ></div>
-                  <span className="text-[12px] text-muted">{nombre}</span>
+            return (
+              <div key={cat.account_name ?? i}>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`w-2 h-2 rounded-full ${bgClass} flex-shrink-0 shadow-[0_0_8px_currentColor]`} />
+                    <span className="text-sm text-secondary truncate">{cat.account_name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="amount text-caption text-muted">
+                      {formatMoney(monto, currency)}
+                    </span>
+                    <span className="amount text-caption font-semibold w-9 text-right text-primary">
+                      {porcentaje}%
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-muted font-mono">
-                    ${monto.toLocaleString()}
-                  </span>
-                  <span className="text-[11px] font-mono font-semibold w-8 text-right">
-                    {porcentaje}%
-                  </span>
+                <div className="pbar">
+                  <div className={`pfill ${bgClass}`} style={{ width: `${porcentaje}%` }} />
                 </div>
               </div>
-              <div className="pbar">
-                <div
-                  className={`pfill ${color}`}
-                  style={{ width: `${porcentaje}%` }}
-                ></div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <button className="mt-5 w-full text-[12px] font-medium text-muted bg-faint hover:bg-ink hover:text-white border border-border hover:border-ink rounded-xl py-2.5 transition-all">
-        Ver movimientos filtrados
-      </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,62 +1,71 @@
+import { formatMoney } from "../../../lib/utils/money";
 
-export function CardPresupuesto({ presupuestos }) {
+export function CardPresupuesto({ presupuestos = [], currency = "CRC" }) {
   return (
-    <div
-      className="bg-white border border-border rounded-2xl p-5 shadow-card animate-fade-up d5"
-      style={{ gridColumn: "2/4", gridRow: "2" }}
-    >
+    <div className="bg-surface border border-default rounded-2xl p-5 shadow-card animate-fade-up">
       <div className="flex items-center justify-between mb-4">
-        <span className="font-semibold text-[17px]">Progreso de presupuestos</span>
-        <a className="text-[11px] text-emerald-600 font-medium hover:underline cursor-pointer">Ver todos →</a>
+        <span className="text-h3 text-primary">Progreso de presupuestos</span>
+        <a className="text-caption text-muted hover:text-accent font-medium cursor-pointer transition-colors duration-base">
+          Ver todos →
+        </a>
       </div>
 
-      <div className="grid grid-cols-[1fr_76px_76px_110px] gap-x-3 pb-2 border-b border-faint mb-1">
-        <span className="text-[15px] font-bold text-muted uppercase tracking-wider">Categoría</span>
-        <span className="text-[15px] font-semibold text-muted uppercase tracking-wider text-right">Gastado</span>
-        <span className="text-[15px] font-semibold text-muted uppercase tracking-wider text-right">Límite</span>
-        <span className="text-[15px] font-semibold text-muted uppercase tracking-wider text-right">Estado</span>
-      </div>
+      {presupuestos.length === 0 ? (
+        <div className="bg-elevated border border-dashed border-default rounded-xl px-4 py-8 text-center">
+          <p className="text-sm text-primary font-medium">Sin presupuestos definidos</p>
+          <p className="text-caption text-muted mt-1">
+            Crea presupuestos para controlar tus categorías
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3.5">
+          {presupuestos.map(({ categoria, gastado, presupuestado }) => {
+            const ratio = presupuestado > 0 ? gastado / presupuestado : 0;
+            const porcentajeReal = Math.round(ratio * 100);
+            const porcentajeBar = Math.min(porcentajeReal, 100);
+            const excedido = ratio >= 1;
+            const justo = ratio >= 0.8 && !excedido;
 
-      <div className="divide-y divide-[#F0EFEC]">
-        {presupuestos.map(({ categoria, gastado, presupuestado }) => {
-          const porcentaje = Math.min(Math.round((gastado / presupuestado) * 100), 100);
-          const excedido = gastado > presupuestado;
-          const justo = porcentaje >= 85 && !excedido;
+            const fillClass = excedido
+              ? "bg-danger text-danger"
+              : justo
+                ? "bg-warning text-warning"
+                : "bg-success text-success";
 
-          const estadoConfig = excedido
-            ? { label: "Excedido", className: "bg-rose-50 text-rose-500" }
-            : justo
-            ? { label: `${porcentaje}%`, className: "bg-amber-50 text-amber-500" }
-            : { label: `${porcentaje}%`, className: "bg-emerald-50 text-emerald-600" };
+            const chipClass = excedido
+              ? "bg-danger/10 text-danger border-danger/30"
+              : justo
+                ? "bg-warning/10 text-warning border-warning/30"
+                : "bg-success/10 text-success border-success/30";
 
-          return (
-            <div
-              key={categoria}
-              className="grid grid-cols-[1fr_76px_76px_110px] gap-x-3 py-2.5 items-center hover:bg-surface rounded-lg -mx-1 px-1 transition-colors"
-            >
-              <span className="text-[15px] font-semibold">{categoria}</span>
+            return (
+              <div key={categoria} className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-primary truncate">{categoria}</span>
+                  <span
+                    className={`text-[10px] font-semibold border px-2 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0 ${chipClass}`}
+                  >
+                    {excedido ? "Excedido" : `${porcentajeReal}%`}
+                  </span>
+                </div>
 
-              <span className={`text-[15px] font-mono text-right ${excedido ? "text-rose-500" : "text-muted"}`}>
-                ${gastado.toLocaleString()}
-              </span>
+                <div className="pbar">
+                  <div className={`pfill ${fillClass}`} style={{ width: `${porcentajeBar}%` }} />
+                </div>
 
-              <span className="text-[15px] font-mono text-right text-muted">
-                ${presupuestado.toLocaleString()}
-              </span>
-
-              <div className="flex justify-end">
-                <span className={`text-[13px] font-semibold px-2 py-1 rounded-lg ${estadoConfig.className}`}>
-                  {estadoConfig.label}
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="amount text-caption text-muted">
+                    {formatMoney(gastado, currency)}{" "}
+                    <span className="text-faint">
+                      / {formatMoney(presupuestado, currency)}
+                    </span>
+                  </span>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <button className="mt-4 w-full text-[12px] font-medium text-muted bg-faint hover:bg-ink hover:text-white border border-border hover:border-ink rounded-xl py-2.5 transition-all">
-        Ver todos los presupuestos
-      </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

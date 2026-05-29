@@ -1,83 +1,60 @@
-import { useState, useEffect, useCallback } from "react";
-
-// ── Static data ──────────────────────────────────────────────
-// Esto Deberia venir de la BD
-const ACCOUNTS = [
-  { id: "Efectivo", label: "Efectivo", emoji: "💵" },
-  { id: "Wink", label: "Wink", emoji: "📱" },
-  { id: "BAC", label: "Tarjeta", emoji: "💳" },
-  { id: "Wink Tarjeta", label: "Wink Tarjeta", emoji: "💳" },
-];
-
-//Esto deberia venir de la BD
-const MERCHANTS = [
-  { id: "walmart", name: "Walmart", sub: "Supermercado", emoji: "🛒" },
-  { id: "spotify", name: "Spotify", sub: "Entretenimiento", emoji: "🎵" },
-  { id: "uber", name: "Uber", sub: "Transporte", emoji: "🚗" },
-];
-
-//Esto deberia venir de la BD, son los que tienen categoria Expense
-const CATEGORIES = [
-  "Alimentacion",
-  "Transporte",
-  "Entretenimiento",
-  "Salud",
-  "Gastos Fijos",
-];
-
-//Esto deberia venir de la BD, son los que tienen categoria Income
-const CATEGORIES_INGRESO = ["Salario", "Extras"];
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { X, TrendingDown, TrendingUp, ArrowRight } from "lucide-react";
+import { useAccountsList } from "../../accounts/hooks/useAccountsList";
 
 const TYPE_META = {
   gasto: {
-    color: "#f43f5e",
-    bg: "#fff1f2",
     label: "Registrar gasto",
-    iconColor: "text-rose-500",
+    Icon: TrendingDown,
+    color: "text-danger",
+    bg: "bg-danger/10",
+    border: "border-danger/30",
+    btn: "bg-danger hover:shadow-[0_0_24px_-4px_rgba(244,63,94,0.5)]",
   },
   ingreso: {
-    color: "#16a34a",
-    bg: "#f0fdf4",
     label: "Registrar ingreso",
-    iconColor: "text-emerald-600",
+    Icon: TrendingUp,
+    color: "text-success",
+    bg: "bg-success/10",
+    border: "border-success/30",
+    btn: "bg-success hover:shadow-[0_0_24px_-4px_rgba(16,185,129,0.5)]",
   },
   transferencia: {
-    color: "#0369a1",
-    bg: "#f0f9ff",
     label: "Registrar transferencia",
-    iconColor: "text-sky-600",
+    Icon: ArrowRight,
+    color: "text-info",
+    bg: "bg-info/10",
+    border: "border-info/30",
+    btn: "bg-info hover:shadow-[0_0_24px_-4px_rgba(56,189,248,0.5)]",
   },
 };
 
-// ── Sub-components ───────────────────────────────────────────
 function FieldLabel({ children }) {
   return (
-    <label className="block text-[11px] font-semibold text-[#9A9890] uppercase tracking-widest mb-1.5">
-      {children}
-    </label>
+    <label className="block text-eyebrow text-muted uppercase mb-2">{children}</label>
   );
 }
 
-function SelectField({ id, value, onChange, placeholder, options }) {
+function SelectField({ value, onChange, placeholder, options, disabled }) {
   return (
     <select
-      id={id}
       value={value}
       onChange={onChange}
-      className="w-full bg-[#F7F6F3] border border-[#E6E4DF] rounded-xl px-3.5 py-2.5 text-[13px] font-medium text-[#111110] focus:outline-none focus:border-[#111110] focus:ring-2 focus:ring-[#111110]/8 transition-all appearance-none"
+      disabled={disabled}
+      className="w-full bg-sunken border border-default rounded-md px-3.5 py-2.5 text-body font-medium text-primary focus:outline-none focus:border-accent focus:shadow-focus transition-all duration-base appearance-none disabled:opacity-50"
       style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239A9890' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
         backgroundRepeat: "no-repeat",
         backgroundPosition: "right 12px center",
       }}
     >
       {placeholder && (
-        <option value="" disabled>
+        <option value="" disabled className="bg-surface">
           {placeholder}
         </option>
       )}
       {options.map((o) => (
-        <option key={o.value} value={o.value}>
+        <option key={o.value} value={o.value} className="bg-surface">
           {o.label}
         </option>
       ))}
@@ -85,228 +62,48 @@ function SelectField({ id, value, onChange, placeholder, options }) {
   );
 }
 
-// ── Dynamic fields per type ───────────────────────────────────
-function GastoFields({ form, setForm }) {
+function EmptyHint({ children }) {
   return (
-    <div className="space-y-4 animate-[fadeFields_.22s_cubic-bezier(0.16,1,0.3,1)_both]">
-      {/* Cuenta de pago */}
-      <div>
-        <FieldLabel>Cuenta de pago</FieldLabel>
-        <SelectField
-          value={form.cuentaOrigen}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, cuentaOrigen: e.target.value }))
-          }
-          placeholder="Selecciona una cuenta"
-          options={ACCOUNTS.map((a) => ({
-            value: a.id,
-            label: `${a.emoji} ${a.label}`,
-          }))}
-        />
-      </div>
-
-      {/* Comercio o categoría */}
-      <div>
-        <FieldLabel>Comercio o categoría</FieldLabel>
-
-        <p className="text-[11px] text-[#9A9890] mb-2">Comercios frecuentes</p>
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          {MERCHANTS.map((m) => {
-            const selected = form.merchant === m.id;
-            return (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() =>
-                  setForm((f) => ({
-                    ...f,
-                    merchant: selected ? "" : m.id,
-                    cuentaDestino: "",
-                  }))
-                }
-                className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all text-center ${
-                  selected
-                    ? "border-[#111110] bg-[#111110] text-white"
-                    : "border-[#E6E4DF] hover:border-[#111110] hover:bg-[#F7F6F3] text-[#111110]"
-                }`}
-              >
-                <span className="text-xl leading-none">{m.emoji}</span>
-                <span className="text-[11px] font-semibold leading-tight">
-                  {m.name}
-                </span>
-                <span
-                  className={`text-[10px] ${selected ? "text-white/50" : "text-[#9A9890]"}`}
-                >
-                  {m.sub}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex-1 h-px bg-[#E6E4DF]" />
-          <span className="text-[10px] text-[#9A9890] font-medium">
-            o elige categoría
-          </span>
-          <div className="flex-1 h-px bg-[#E6E4DF]" />
-        </div>
-
-        <SelectField
-          value={form.cuentaDestino}
-          onChange={(e) =>
-            setForm((f) => ({
-              ...f,
-              cuentaDestino: e.target.value,
-              merchant: "",
-            }))
-          }
-          placeholder="Selecciona una categoría"
-          options={CATEGORIES.map((c) => ({ value: c, label: c }))}
-        />
-      </div>
+    <div className="text-caption text-muted bg-elevated border border-dashed border-default rounded-md px-3 py-2">
+      {children}
     </div>
   );
 }
 
-function IngresoFields({ form, setForm }) {
-  return (
-    <div className="animate-[fadeFields_.22s_cubic-bezier(0.16,1,0.3,1)_both]">
-      <FieldLabel>Cuenta de destino</FieldLabel>
-      <SelectField
-        value={form.cuentaDestino}
-        onChange={(e) =>
-          setForm((f) => ({ ...f, cuentaDestino: e.target.value }))
-        }
-        placeholder="Selecciona una cuenta"
-        options={ACCOUNTS.map((a) => ({
-          value: a.id,
-          label: `${a.emoji} ${a.label}`,
-        }))}
-      />
-      <div className="flex items-center gap-2 mb-3">
-        <div className="flex-1 h-px bg-[#E6E4DF]" />
-        <span className="text-[10px] text-[#9A9890] font-medium">
-         Categoria del ingreso
-        </span>
-        <div className="flex-1 h-px bg-[#E6E4DF]" />
-      </div>
-
-      <SelectField
-        value={form.cuentaOrigen}
-        onChange={(e) =>
-          setForm((f) => ({
-            ...f,
-            cuentaOrigen: e.target.value,
-            merchant: "",
-          }))
-        }
-        placeholder="Selecciona una categoría"
-        options={CATEGORIES_INGRESO.map((c) => ({ value: c, label: c }))}
-      />
-    </div>
-  );
-}
-
-function TransferenciaFields({ form, setForm }) {
-  const destinoOptions = ACCOUNTS.filter((a) => a.id !== form.cuentaOrigen).map(
-    (a) => ({ value: a.id, label: `${a.emoji} ${a.label}` }),
-  );
-
-  return (
-    <div className="space-y-3 animate-[fadeFields_.22s_cubic-bezier(0.16,1,0.3,1)_both]">
-      {/* Origen */}
-      <div>
-        <FieldLabel>Cuenta de origen</FieldLabel>
-        <SelectField
-          value={form.cuentaOrigen}
-          onChange={(e) =>
-            setForm((f) => ({
-              ...f,
-              cuentaOrigen: e.target.value,
-              cuentaDestino: "",
-            }))
-          }
-          placeholder="Selecciona cuenta origen"
-          options={ACCOUNTS.map((a) => ({
-            value: a.id,
-            label: `${a.emoji} ${a.label}`,
-          }))}
-        />
-      </div>
-
-      {/* Arrow divider */}
-      <div className="flex items-center gap-3 py-0.5">
-        <div className="flex-1 h-px bg-[#E6E4DF]" />
-        <div className="w-7 h-7 rounded-full bg-[#F0EFEC] border border-[#E6E4DF] flex items-center justify-center flex-shrink-0">
-          <svg
-            className="w-3.5 h-3.5 text-[#9A9890]"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M19 12H5m7 7l7-7-7-7"
-            />
-          </svg>
-        </div>
-        <div className="flex-1 h-px bg-[#E6E4DF]" />
-      </div>
-
-      {/* Destino */}
-      <div>
-        <FieldLabel>Cuenta de destino</FieldLabel>
-        <SelectField
-          value={form.cuentaDestino}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, cuentaDestino: e.target.value }))
-          }
-          placeholder="Selecciona cuenta destino"
-          options={destinoOptions}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ── Default form state ────────────────────────────────────────
 const defaultForm = {
   nombre: "",
   monto: "",
   tipo: "gasto",
-  // gasto
-  merchant: "",
-  categoria: "",
-  // ingreso
-  cuentaDestino: "",
-  // transferencia
-  cuentaOrigen: "",
+  cuentaOrigenId: "",
+  cuentaDestinoId: "",
 };
 
-// ── Main component ────────────────────────────────────────────
-export default function ModalNuevoMovimiento({ isOpen, onClose, onSave }) {
+export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving = false }) {
   const [form, setForm] = useState(defaultForm);
   const [visible, setVisible] = useState(false);
 
-  // Animate in/out
+  const { data: accounts = [], isLoading: loadingAccounts } = useAccountsList();
+
+  const { paymentAccounts, expenseCategories, incomeCategories } = useMemo(() => {
+    return {
+      paymentAccounts: accounts.filter((a) => a.type === "ASSET" || a.type === "LIABILITY"),
+      expenseCategories: accounts.filter((a) => a.type === "EXPENSE"),
+      incomeCategories: accounts.filter((a) => a.type === "INCOME"),
+    };
+  }, [accounts]);
+
   useEffect(() => {
-    if (isOpen) {
-      setVisible(true);
-    } else {
-      const t = setTimeout(() => setVisible(false), 200);
+    if (isOpen) setVisible(true);
+    else {
+      const t = setTimeout(() => setVisible(false), 280);
       return () => clearTimeout(t);
     }
   }, [isOpen]);
 
-  // Reset on open
   useEffect(() => {
     if (isOpen) setForm(defaultForm);
   }, [isOpen]);
 
-  // Escape key
   const handleKey = useCallback(
     (e) => {
       if (e.key === "Escape") onClose();
@@ -319,7 +116,6 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave }) {
     return () => document.removeEventListener("keydown", handleKey);
   }, [isOpen, handleKey]);
 
-  // Lock body scroll
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
     return () => {
@@ -332,228 +128,275 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave }) {
   const meta = TYPE_META[form.tipo];
 
   function handleSave() {
-    // Basic validation
     if (!form.nombre.trim() || !form.monto) return;
-    onSave({ ...form, monto: parseFloat(form.monto) });
-    onClose();
+    if (!form.cuentaOrigenId || !form.cuentaDestinoId) return;
+    onSave({
+      ...form,
+      monto: parseFloat(form.monto),
+      cuentaOrigenId: Number(form.cuentaOrigenId),
+      cuentaDestinoId: Number(form.cuentaDestinoId),
+    });
   }
+
+  const accOptions = (list) => list.map((a) => ({ value: String(a.id), label: a.name }));
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center transition-opacity duration-200 ${isOpen ? "opacity-100" : "opacity-0"}`}
+      className={`fixed inset-0 z-[100] flex items-center justify-center transition-opacity duration-slow ${
+        isOpen ? "opacity-100" : "opacity-0"
+      }`}
     >
-      {/* Overlay */}
       <div
-        className="fixed z-[100] inset-0 bg-[#111110]/60 backdrop-blur-[3px]"
+        className="fixed inset-0 bg-black/70 backdrop-blur-md"
         onClick={onClose}
       />
 
-      {/* Panel */}
       <div
-        className={`relative z-[101] bg-white rounded-2xl w-full max-w-[440px] mx-4 my-auto max-h-[90vh] flex flex-col transition-all duration-[280ms] ${
-          isOpen
-            ? "opacity-100 translate-y-0 scale-100"
-            : "opacity-0 translate-y-4 scale-[0.98]"
+        className={`relative z-[101] bg-surface rounded-3xl w-full max-w-[480px] mx-4 my-auto max-h-[90vh] flex flex-col transition-all duration-slow ease-standard shadow-modal ${
+          isOpen ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-[0.96]"
         }`}
-        style={{
-          boxShadow:
-            "0 24px 64px -12px rgba(0,0,0,0.18), 0 8px 24px -8px rgba(0,0,0,0.10)",
-        }}
       >
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-5 border-b border-[#E6E4DF]">
+        <div className="flex items-center justify-between px-6 pt-6 pb-5 border-b border-default">
           <div>
-            <h2 className="font-semibold text-[15px] tracking-tight">
-              Nuevo movimiento
-            </h2>
-            <p className="text-[11px] text-[#9A9890] mt-0.5">
+            <h2 className="font-display text-h2 text-primary">Nuevo movimiento</h2>
+            <p className="text-caption text-muted mt-1">
               Registra un ingreso, gasto o transferencia
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-[#F0EFEC] hover:bg-[#E6E4DF] flex items-center justify-center transition-colors flex-shrink-0"
+            className="w-8 h-8 rounded-lg bg-elevated hover:bg-base flex items-center justify-center transition-colors duration-base flex-shrink-0"
+            aria-label="Cerrar"
           >
-            <svg
-              className="w-3.5 h-3.5 text-[#9A9890]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <X className="w-3.5 h-3.5 text-muted" strokeWidth={2.5} />
           </button>
         </div>
 
-        {/* ── Body ── */}
-        <div
-          className="px-6 py-5 space-y-5 overflow-y-auto max-h-[70vh]"
-          style={{
-            scrollbarWidth: "thin",
-            scrollbarColor: "#D5D3CE transparent",
-          }}
-        >
-          {/* Type selector */}
+        <div className="px-6 py-5 space-y-5 overflow-y-auto thin-scroll max-h-[70vh]">
           <div>
             <FieldLabel>Tipo</FieldLabel>
-            <div className="grid grid-cols-3 gap-1.5 bg-[#F0EFEC] p-1 rounded-xl">
+            <div className="grid grid-cols-3 gap-1.5 bg-sunken p-1 rounded-xl border border-default">
               {["gasto", "ingreso", "transferencia"].map((t) => {
                 const m = TYPE_META[t];
+                const Icon = m.Icon;
                 const active = form.tipo === t;
                 return (
                   <button
                     key={t}
                     type="button"
                     onClick={() =>
-                      setForm((f) => ({ ...defaultForm, tipo: t }))
+                      setForm((f) => ({
+                        ...defaultForm,
+                        nombre: f.nombre,
+                        monto: f.monto,
+                        tipo: t,
+                      }))
                     }
-                    className="flex flex-col items-center gap-1 py-2.5 px-2 rounded-[10px] transition-all"
-                    style={
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg transition-all duration-base ease-standard ${
                       active
-                        ? {
-                            background: m.bg,
-                            color: m.color,
-                            boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-                          }
-                        : { color: "#9A9890" }
-                    }
+                        ? `${m.bg} ${m.color} border ${m.border}`
+                        : "text-muted hover:text-secondary hover:bg-elevated border border-transparent"
+                    }`}
                   >
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center">
-                      {t === "gasto" && (
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      )}
-                      {t === "ingreso" && (
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M5 15l7-7 7 7"
-                          />
-                        </svg>
-                      )}
-                      {t === "transferencia" && (
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                          />
-                        </svg>
-                      )}
-                    </div>
-                    <span className="text-[11px] font-semibold capitalize">
-                      {t}
-                    </span>
+                    <Icon className="w-3.5 h-3.5" strokeWidth={2.25} />
+                    <span className="text-[11px] font-semibold capitalize">{t}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Nombre */}
           <div>
             <FieldLabel>Nombre</FieldLabel>
             <input
               type="text"
               value={form.nombre}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, nombre: e.target.value }))
-              }
+              onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
               placeholder="Ej. Supermercado, Salario…"
-              className="w-full bg-[#F7F6F3] border border-[#E6E4DF] rounded-xl px-3.5 py-2.5 text-[13px] font-medium placeholder-[#C8C6C0] focus:outline-none focus:border-[#111110] focus:ring-2 focus:ring-[#111110]/8 transition-all"
+              className="w-full bg-sunken border border-default rounded-md px-3.5 py-2.5 text-body font-medium text-primary placeholder:text-faint focus:outline-none focus:border-accent focus:shadow-focus transition-all duration-base"
             />
           </div>
 
-          {/* Monto */}
           <div>
             <FieldLabel>Monto</FieldLabel>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-[15px] font-medium text-[#C8C6C0] pointer-events-none">
-                $
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 amount text-num-md text-faint pointer-events-none">
+                ₡
               </span>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 value={form.monto}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, monto: e.target.value }))
-                }
+                onChange={(e) => setForm((f) => ({ ...f, monto: e.target.value }))}
                 placeholder="0.00"
-                className="w-full bg-[#F7F6F3] border border-[#E6E4DF] rounded-xl pl-8 pr-3.5 py-2.5 font-mono text-[15px] font-medium tracking-tight placeholder-[#C8C6C0] focus:outline-none focus:border-[#111110] focus:ring-2 focus:ring-[#111110]/8 transition-all"
+                className="w-full bg-sunken border border-default rounded-md pl-9 pr-3.5 py-2.5 amount text-num-md tracking-tight text-primary placeholder:text-faint focus:outline-none focus:border-accent focus:shadow-focus transition-all duration-base"
               />
             </div>
           </div>
 
-          {/* Dynamic fields */}
-          {form.tipo === "gasto" && (
-            <GastoFields form={form} setForm={setForm} />
+          {loadingAccounts && (
+            <div className="space-y-2">
+              <div className="skeleton h-[42px]" />
+              <div className="skeleton h-[42px]" />
+            </div>
           )}
-          {form.tipo === "ingreso" && (
-            <IngresoFields form={form} setForm={setForm} />
+
+          {!loadingAccounts && form.tipo === "gasto" && (
+            <div className="space-y-4 animate-fade-in">
+              <div>
+                <FieldLabel>Cuenta de pago</FieldLabel>
+                {paymentAccounts.length === 0 ? (
+                  <EmptyHint>
+                    Aún no tienes cuentas. Crea una en la pestaña Cuentas.
+                  </EmptyHint>
+                ) : (
+                  <SelectField
+                    value={form.cuentaOrigenId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cuentaOrigenId: e.target.value }))
+                    }
+                    placeholder="Selecciona una cuenta"
+                    options={accOptions(paymentAccounts)}
+                  />
+                )}
+              </div>
+
+              <div>
+                <FieldLabel>Categoría</FieldLabel>
+                {expenseCategories.length === 0 ? (
+                  <EmptyHint>
+                    Sin categorías de gasto. Crea una en Cuentas → Categorías.
+                  </EmptyHint>
+                ) : (
+                  <SelectField
+                    value={form.cuentaDestinoId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cuentaDestinoId: e.target.value }))
+                    }
+                    placeholder="Selecciona una categoría"
+                    options={accOptions(expenseCategories)}
+                  />
+                )}
+              </div>
+            </div>
           )}
-          {form.tipo === "transferencia" && (
-            <TransferenciaFields form={form} setForm={setForm} />
+
+          {!loadingAccounts && form.tipo === "ingreso" && (
+            <div className="space-y-4 animate-fade-in">
+              <div>
+                <FieldLabel>Cuenta de destino</FieldLabel>
+                {paymentAccounts.length === 0 ? (
+                  <EmptyHint>
+                    Aún no tienes cuentas. Crea una en la pestaña Cuentas.
+                  </EmptyHint>
+                ) : (
+                  <SelectField
+                    value={form.cuentaDestinoId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cuentaDestinoId: e.target.value }))
+                    }
+                    placeholder="Selecciona una cuenta"
+                    options={accOptions(paymentAccounts)}
+                  />
+                )}
+              </div>
+
+              <div>
+                <FieldLabel>Categoría del ingreso</FieldLabel>
+                {incomeCategories.length === 0 ? (
+                  <EmptyHint>
+                    Sin categorías de ingreso. Crea una en Cuentas → Categorías.
+                  </EmptyHint>
+                ) : (
+                  <SelectField
+                    value={form.cuentaOrigenId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cuentaOrigenId: e.target.value }))
+                    }
+                    placeholder="Selecciona una categoría"
+                    options={accOptions(incomeCategories)}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {!loadingAccounts && form.tipo === "transferencia" && (
+            <div className="space-y-3 animate-fade-in">
+              <div>
+                <FieldLabel>Cuenta de origen</FieldLabel>
+                {paymentAccounts.length < 2 ? (
+                  <EmptyHint>Necesitas al menos 2 cuentas para transferir.</EmptyHint>
+                ) : (
+                  <SelectField
+                    value={form.cuentaOrigenId}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        cuentaOrigenId: e.target.value,
+                        cuentaDestinoId:
+                          f.cuentaDestinoId === e.target.value ? "" : f.cuentaDestinoId,
+                      }))
+                    }
+                    placeholder="Selecciona cuenta origen"
+                    options={accOptions(paymentAccounts)}
+                  />
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 py-0.5">
+                <div className="flex-1 h-px bg-white/10" />
+                <div className="w-7 h-7 rounded-full bg-info/10 border border-info/30 flex items-center justify-center flex-shrink-0">
+                  <ArrowRight className="w-3.5 h-3.5 text-info" strokeWidth={2.5} />
+                </div>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
+
+              <div>
+                <FieldLabel>Cuenta de destino</FieldLabel>
+                {paymentAccounts.length < 2 ? (
+                  <EmptyHint>Necesitas al menos 2 cuentas para transferir.</EmptyHint>
+                ) : (
+                  <SelectField
+                    value={form.cuentaDestinoId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cuentaDestinoId: e.target.value }))
+                    }
+                    placeholder="Selecciona cuenta destino"
+                    options={accOptions(
+                      paymentAccounts.filter((a) => String(a.id) !== form.cuentaOrigenId),
+                    )}
+                    disabled={!form.cuentaOrigenId}
+                  />
+                )}
+              </div>
+            </div>
           )}
         </div>
 
-        {/* ── Footer ── */}
-        <div className="px-6 pb-6 pt-4 flex gap-2.5 border-t border-[#E6E4DF]">
+        <div className="px-6 pb-6 pt-4 flex gap-2.5 border-t border-default">
           <button
+            type="button"
             onClick={onClose}
-            className="flex-1 text-[13px] font-medium text-[#9A9890] bg-[#F0EFEC] hover:bg-[#E6E4DF] border border-[#E6E4DF] rounded-xl py-2.5 transition-colors"
+            className="flex-1 text-[13px] font-medium text-secondary bg-elevated hover:bg-base border border-default rounded-md py-2.5 transition-colors duration-base"
           >
             Cancelar
           </button>
           <button
+            type="button"
             onClick={handleSave}
-            disabled={!form.nombre.trim() || !form.monto}
-            className="flex-1 text-[13px] font-medium text-white rounded-xl py-2.5 transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: meta.color }}
+            disabled={
+              !form.nombre.trim() ||
+              !form.monto ||
+              !form.cuentaOrigenId ||
+              !form.cuentaDestinoId ||
+              isSaving
+            }
+            className={`flex-1 text-[13px] font-semibold text-white rounded-md py-2.5 transition-all duration-base ease-standard active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed ${meta.btn}`}
           >
-            <svg
-              className="w-3.5 h-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            {meta.label}
+            {isSaving ? "Guardando…" : meta.label}
           </button>
         </div>
       </div>

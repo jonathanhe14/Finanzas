@@ -1,4 +1,34 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
+import { formatMoney } from "../../../lib/utils/money";
+
+// Mini sparkline (decorative, signals trend visually)
+function Sparkline({ trending }) {
+  const isUp = trending === "up";
+  const path = isUp
+    ? "M0,18 L12,14 L24,16 L36,10 L48,12 L60,5"
+    : "M0,5 L12,9 L24,7 L36,13 L48,11 L60,18";
+  const color = isUp ? "#10B981" : "#F43F5E";
+  const id = `spark-${trending}`;
+  return (
+    <svg width="64" height="22" viewBox="0 0 60 22" className="overflow-visible">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${path} L60,22 L0,22 Z`} fill={`url(#${id})`} />
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export const CardFlujo = ({
   trending,
@@ -6,57 +36,50 @@ export const CardFlujo = ({
   saldo,
   porcentaje,
   descripcion,
+  currency = "CRC",
 }) => {
+  const isUp = trending === "up";
+  const Icon = isUp ? TrendingUp : TrendingDown;
+  const semantic = isUp
+    ? {
+        iconBg: "bg-success/10",
+        iconColor: "text-success",
+        chip: "bg-success/10 text-success border-success/30",
+      }
+    : {
+        iconBg: "bg-danger/10",
+        iconColor: "text-danger",
+        chip: "bg-danger/10 text-danger border-danger/30",
+      };
+
+  const showPct =
+    typeof porcentaje === "number" && !Number.isNaN(porcentaje) && porcentaje !== 0;
+
   return (
-    <div className="kpi-card bg-white border border-border rounded-2xl p-5 shadow-card animate-fade-up overflow-hidden relative">
-      <div className="flex items-start justify-between mb-4">
+    <div className="card-gradient-border rounded-2xl p-5 animate-fade-up">
+      <div className="flex items-start justify-between mb-5">
         <div
-          className={`w-9 h-9 rounded-xl ${trending === "up" ? "bg-green-100" : "bg-rose-50"} flex items-center justify-center`}
+          className={`w-10 h-10 rounded-xl ${semantic.iconBg} flex items-center justify-center ring-1 ring-inset ring-white/5`}
         >
-          {trending === "up" ? (
-            <TrendingUp className="w-4 h-4 text-green-600" />
-          ) : (
-            <TrendingDown className="w-4 h-4 text-rose-600" />
-          )}
+          <Icon className={`w-4 h-4 ${semantic.iconColor}`} strokeWidth={2.25} />
         </div>
-        <svg width="56" height="24" viewBox="0 0 56 24">
-          <polyline
-            points="0,20 9,16 18,14 28,18 38,10 47,13 56,6"
-            fill="none"
-            stroke="#fecdd3"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <polyline
-            points="0,20 9,16 18,14 28,18 38,10 47,13 56,6"
-            fill="none"
-            stroke="#f43f5e"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <Sparkline trending={trending} />
       </div>
-      <div className="text-[11px] font-semibold text-muted uppercase tracking-widest mb-1">
-        {nombre}
+
+      <div className="text-eyebrow text-muted uppercase mb-2">{nombre}</div>
+
+      <div className="amount text-num-lg text-primary leading-none mb-3">
+        {formatMoney(saldo, currency)}
       </div>
-      <div className="num font-mono text-[22px] font-medium tracking-tight leading-none mb-3">
-        ${saldo.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, "$&,")}
-      </div>
+
       <div className="flex items-center gap-1.5">
         <span
-          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full${
-            trending === "up"
-              ? "bg-green-100 text-green-600"
-              : "bg-rose-50 text-rose-600"
-          }`}
+          className={`text-[10px] font-semibold border px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1 ${semantic.chip}`}
         >
-          {porcentaje > 0
-            ? `+${porcentaje.toFixed(2)}%`
-            : `${porcentaje.toFixed(2)}%`}
+          <Icon className="w-3 h-3" strokeWidth={2.5} />
+          {showPct ? `${porcentaje > 0 ? "+" : ""}${porcentaje.toFixed(1)}%` : "—"}
         </span>
-        <span className="text-[11px] text-muted">{descripcion}</span>
+        <span className="text-caption text-muted">{descripcion}</span>
       </div>
     </div>
   );

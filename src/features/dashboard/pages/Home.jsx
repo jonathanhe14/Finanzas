@@ -1,10 +1,9 @@
-import { CardFlujo } from "../components/CardFlujo";
 import { useState, useEffect } from "react";
-import { supabase } from "../../../lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
-import { useAccunts } from "../hooks/useAccounts";
-import { Sidebar } from "../../../components/Sidebar";
 import { Plus, Search, ChevronRight, ChevronLeft } from "lucide-react";
+import { supabase } from "../../../lib/supabaseClient";
+import { Sidebar } from "../../../components/Sidebar";
+import { CardFlujo } from "../components/CardFlujo";
 import { CardBalance } from "../components/CardBalance";
 import { CardUltimosMovimientos } from "../components/CardUltimosMovimientos";
 import { CardGastosCategoria } from "../components/CardGastosCategoria";
@@ -12,151 +11,173 @@ import { CardPresupuesto } from "../components/CardPresupuesto";
 import ModalNuevoMovimiento from "../components/ModalNuevoMovimiento";
 import { useDashboardReport } from "../hooks/useDashboardReport";
 import { useRecentEntries } from "../hooks/useRecentEntries";
+import { useCreateMovement } from "../hooks/useCreateMovement";
 
 const handleLogout = () => {
-  console.log("Usuario ha cerrado sesión");
   supabase.auth.signOut();
 };
 
+const MES_ACTUAL = new Date().toLocaleDateString("es-CR", {
+  month: "long",
+  year: "numeric",
+});
+
 function Home() {
-  const [status, setStatus] = useState("idle");
-  //Comprobar luego
-  const [entryId, setEntryId] = useState(null);
-  const [error, setError] = useState(null);
-  const { addJournalEntry, getGastosTotalesMes } = useAccunts();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [openModal, setOpenModal] = useState(false);
   const navigate = useNavigate();
+  const createMovement = useCreateMovement();
 
   useEffect(() => {
-    if (!supabase.auth.getUser()) {
-      console.log("No hay usuario autenticado");
-      navigate("/login");
-    }
-    console.log("Usuario autenticado:", supabase.auth.getUser());
-    getGastosTotalesMes().then(({ total, error }) => {
-      if (error) {
-        console.error("Error al obtener gastos totales del mes:", error);
-      } else {
-        console.log("Gastos totales del mes:", total);
-      }
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data?.user) navigate("/login");
     });
   }, [navigate]);
-  const { data: dashboardData, isLoading, isError } = useDashboardReport();
+
+  const { data: dashboardData } = useDashboardReport();
   const { data: recentEntries = [] } = useRecentEntries();
 
-
   async function asyncHandleSave(movement) {
-    const newMovement = {
-      date: "2026-03-28",
-      description: movement.nombre,
-      merchant_id: null,
-      status: "CLEARED",
-      currency_code: "CRC",
-      type: movement.tipo,
-      amount: movement.monto,
-      memo: movement.nombre + " - " + movement.fecha,
-    };
-    const accountNames = [movement.cuentaDestino, movement.cuentaOrigen];
     try {
-      console.log("Intentando crear entrada con cuentas:", accountNames);
-      const newEntryId = await addJournalEntry(accountNames, newMovement);
-      setEntryId(newEntryId);
-      setStatus("success");
-      console.log("Entrada creada con ID:", newEntryId);
+      await createMovement.mutateAsync({
+        entry_date: new Date().toISOString().slice(0, 10),
+        description: movement.nombre,
+        amount: movement.monto,
+        currency_code: "CRC",
+        debit_account_id: movement.cuentaDestinoId,
+        credit_account_id: movement.cuentaOrigenId,
+        memo: movement.nombre,
+      });
+      setOpenModal(false);
     } catch (e) {
-      setError(e.message || String(e));
-      setStatus("error");
+      alert("Error al guardar el movimiento: " + (e.message || String(e)));
     }
   }
 
+  const mesCapitalizado = MES_ACTUAL.charAt(0).toUpperCase() + MES_ACTUAL.slice(1);
+
   return (
-    <div className="min-h-screen flex text-ink text-sm w-full">
+    <div className="min-h-screen w-full text-primary">
       <Sidebar handleLogout={handleLogout} />
-      <div className="ml-[200px] flex-1 flex flex-col min-h-screen">
-        <header className="h-14 bg-white/80 backdrop-blur-md border-b border-border flex items-center justify-between px-7 sticky top-0 z-10 ">
-          <h1 className="font-semibold text-[15px] tracking-tight">
-            Dashboard
-          </h1>
+
+      <div className="ml-[64px] flex flex-col min-h-screen">
+        <header className="relative h-16 glass-panel border-b border-default flex items-center justify-between px-6 sticky top-0 z-30">
+          {/* Bottom accent line on header */}
+          <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent pointer-events-none" />
+
+          <div>
+            <h1 className="font-display text-h2 text-primary flex items-center gap-2">
+              Dashboard
+              <span className="w-1 h-1 rounded-full bg-accent shadow-[0_0_6px_rgba(6,182,212,0.8)] animate-pulse-dot" />
+            </h1>
+            <p className="text-caption text-muted -mt-0.5">
+              Resumen del período actual
+            </p>
+          </div>
+
           <div className="flex items-center gap-2.5">
-            <div className="flex items-center gap-2 bg-faint border border-border rounded-xl px-3 py-[7px] text-[12px] font-medium">
-              <button className="text-muted hover:text-ink transition-colors">
-                <ChevronLeft className="w-4 h-4" color="black" />
+            <div className="flex items-center bg-surface border border-default rounded-md p-0.5">
+              <button
+                type="button"
+                className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:bg-elevated hover:text-primary transition-colors duration-base"
+                aria-label="Mes anterior"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
               </button>
-              <span className="px-1 text-[13px]">Marzo 2026</span>
-              <button className="text-muted hover:text-ink transition-colors">
-                <ChevronRight className="w-4 h-4" color="black" />
+              <span className="num-chip px-2.5 text-[12px] text-primary font-medium capitalize">
+                {mesCapitalizado}
+              </span>
+              <button
+                type="button"
+                className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:bg-elevated hover:text-primary transition-colors duration-base"
+                aria-label="Mes siguiente"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="flex items-center gap-2 bg-faint border border-border rounded-xl px-3 py-[7px] text-[12px] text-muted w-36">
-              <Search className="w-3.5 h-3.5" color="black" />
-              Buscar…
+            <div className="hidden md:flex items-center gap-2 bg-surface border border-default rounded-md px-3 py-1.5 w-44 focus-within:border-accent focus-within:shadow-focus transition-all duration-base">
+              <Search className="w-3.5 h-3.5 text-faint" />
+              <input
+                type="text"
+                placeholder="Buscar…"
+                className="bg-transparent border-0 outline-none flex-1 text-[12px] text-primary placeholder:text-faint"
+              />
             </div>
 
             <button
               onClick={() => setOpenModal(true)}
-              className="bg-ink text-white text-[12px] font-medium rounded-xl px-4 py-[7px] flex items-center gap-1.5 hover:bg-ink/80 transition-colors shadow-sm"
+              type="button"
+              className="group bg-brand-gradient text-white text-[12px] font-semibold rounded-md px-3.5 py-2 flex items-center gap-1.5 hover:shadow-glow-lg active:scale-[0.97] transition-all duration-base ease-standard"
             >
-              <Plus className="w-3.5 h-3.5" color="white" />
+              <Plus
+                className="w-3.5 h-3.5 transition-transform duration-base group-hover:rotate-90"
+                strokeWidth={2.5}
+              />
               Nuevo movimiento
             </button>
           </div>
         </header>
-        <div
-          className="p-6 grid gap-4"
-          style={{
-            gridTemplateColumns: "1fr 1fr 1fr 292px",
-            gridTemplateRows: "auto auto auto",
-          }}
-        >
-          <ModalNuevoMovimiento
-            isOpen={openModal}
-            onClose={() => setOpenModal(false)}
-            onSave={asyncHandleSave}
-          />
-          {/* Aqui dentro van los cards */}
-          <div className="col-span-3 grid grid-cols-4 gap-3">
+
+        <main className="flex-1 p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <CardFlujo
-              trending={"down"}
+              trending="down"
               nombre="Gasto del mes"
               saldo={dashboardData?.expense_total ?? 0}
               porcentaje={0}
               descripcion="vs mes pasado"
             />
             <CardFlujo
-              trending={"up"}
+              trending="up"
               nombre="Ingreso del mes"
               saldo={dashboardData?.income_total ?? 0}
               porcentaje={0}
               descripcion="vs mes pasado"
             />
             <CardBalance
-              nombre="Balance Disponible"
+              nombre="Balance disponible"
               saldo={dashboardData?.asset_balance ?? 0}
               tipo="ASSET"
               detalles="Disponible para gastar"
             />
             <CardBalance
-              nombre="Deuda de Tarjeta"
+              nombre="Deuda de tarjeta"
               saldo={dashboardData?.liability_balance ?? 0}
               tipo="LIABILITY"
-              detalles="Proximo pago 15 de Abril"
+              detalles="Próximo pago 15 de abril"
             />
           </div>
-          <CardUltimosMovimientos movimientos={recentEntries} />
-          <CardGastosCategoria
-            categorias={dashboardData?.expense_by_category ?? []}
-          />
-          <CardPresupuesto
-            presupuestos={[
-              { categoria: "Alimentación", gastado: 320, presupuestado: 450 },
-              { categoria: "Transporte", gastado: 210, presupuestado: 200 },
-              { categoria: "Entretenimiento", gastado: 80, presupuestado: 100 },
-              { categoria: "Salud", gastado: 175, presupuestado: 180 },
-            ]}
-          />
-        </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-8 lg:row-span-2 min-h-[420px]">
+              <CardUltimosMovimientos movimientos={recentEntries} />
+            </div>
+
+            <div className="lg:col-span-4">
+              <CardGastosCategoria
+                categorias={dashboardData?.expense_by_category ?? []}
+              />
+            </div>
+
+            <div className="lg:col-span-4">
+              <CardPresupuesto
+                presupuestos={[
+                  { categoria: "Alimentación", gastado: 320, presupuestado: 450 },
+                  { categoria: "Transporte", gastado: 210, presupuestado: 200 },
+                  { categoria: "Entretenimiento", gastado: 80, presupuestado: 100 },
+                  { categoria: "Salud", gastado: 175, presupuestado: 180 },
+                ]}
+              />
+            </div>
+          </div>
+        </main>
+
+        <ModalNuevoMovimiento
+          isOpen={openModal}
+          onClose={() => setOpenModal(false)}
+          onSave={asyncHandleSave}
+          isSaving={createMovement.isPending}
+        />
       </div>
     </div>
   );

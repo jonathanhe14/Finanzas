@@ -4,6 +4,7 @@ export const QUERY_KEYS = {
   RECENT_MOVEMENTS: 'recent-movements',
   BUDGET_PROGRESS:  'budget-progress',
   ACCOUNTS:         'accounts',
+  CURRENCIES:       'currencies',
   JOURNAL_ENTRIES:  'journal-entries',
   BUDGETS:          'budgets',
   MERCHANTS:        'merchants',
