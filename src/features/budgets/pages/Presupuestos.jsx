@@ -13,6 +13,7 @@ import {
   useCreateMonthlyBudget,
 } from "../hooks/useBudgets";
 import { BudgetRow } from "../components/BudgetRow";
+import { FixedExpensesTab } from "../components/FixedExpensesTab";
 
 const handleLogout = () => {
   supabase.auth.signOut();
@@ -22,6 +23,7 @@ export default function Presupuestos() {
   const navigate = useNavigate();
   const now = new Date();
   const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() });
+  const [tab, setTab] = useState("categorias");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -118,30 +120,58 @@ export default function Presupuestos() {
             </p>
           </div>
 
-          <div className="flex items-center bg-surface border border-default rounded-md p-0.5">
-            <button
-              type="button"
-              onClick={() => shiftMonth(-1)}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:bg-elevated hover:text-primary transition-colors duration-base"
-              aria-label="Mes anterior"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <span className="num-chip px-2.5 text-[12px] text-primary font-medium capitalize">
-              {mesCapitalizado}
-            </span>
-            <button
-              type="button"
-              onClick={() => shiftMonth(1)}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:bg-elevated hover:text-primary transition-colors duration-base"
-              aria-label="Mes siguiente"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-surface border border-default rounded-md p-0.5">
+              {[
+                { id: "categorias", label: "Por categoría" },
+                { id: "fijos", label: "Gastos fijos" },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTab(t.id)}
+                  className={`px-2.5 h-7 rounded-md text-[12px] font-medium transition-colors duration-base ${
+                    tab === t.id
+                      ? "bg-elevated text-primary"
+                      : "text-muted hover:text-primary"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {tab === "categorias" && (
+              <div className="flex items-center bg-surface border border-default rounded-md p-0.5">
+                <button
+                  type="button"
+                  onClick={() => shiftMonth(-1)}
+                  className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:bg-elevated hover:text-primary transition-colors duration-base"
+                  aria-label="Mes anterior"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="num-chip px-2.5 text-[12px] text-primary font-medium capitalize">
+                  {mesCapitalizado}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => shiftMonth(1)}
+                  className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:bg-elevated hover:text-primary transition-colors duration-base"
+                  aria-label="Mes siguiente"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         </header>
 
         <main className="p-6 lg:p-8 max-w-4xl w-full mx-auto flex-1 animate-fade-up">
+          {tab === "fijos" && <FixedExpensesTab />}
+
+          {tab === "categorias" && (
+          <>
           {isError && (
             <div className="text-sm text-danger bg-danger/10 border border-danger/30 rounded-xl px-4 py-3 mb-4">
               Error al cargar: {error?.message}
@@ -211,6 +241,8 @@ export default function Presupuestos() {
                 </div>
               )}
             </>
+          )}
+          </>
           )}
         </main>
       </div>

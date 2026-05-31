@@ -78,7 +78,8 @@ const defaultForm = {
   cuentaDestinoId: "",
 };
 
-export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving = false }) {
+export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving = false, initial = null }) {
+  const isEdit = !!initial;
   const [form, setForm] = useState(defaultForm);
   const [visible, setVisible] = useState(false);
 
@@ -101,8 +102,19 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
   }, [isOpen]);
 
   useEffect(() => {
-    if (isOpen) setForm(defaultForm);
-  }, [isOpen]);
+    if (!isOpen) return;
+    if (initial) {
+      setForm({
+        nombre: initial.nombre ?? "",
+        monto: initial.monto != null ? String(initial.monto) : "",
+        tipo: initial.tipo ?? "gasto",
+        cuentaOrigenId: initial.cuentaOrigenId != null ? String(initial.cuentaOrigenId) : "",
+        cuentaDestinoId: initial.cuentaDestinoId != null ? String(initial.cuentaDestinoId) : "",
+      });
+    } else {
+      setForm(defaultForm);
+    }
+  }, [isOpen, initial]);
 
   const handleKey = useCallback(
     (e) => {
@@ -158,9 +170,13 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
       >
         <div className="flex items-center justify-between px-6 pt-6 pb-5 border-b border-default">
           <div>
-            <h2 className="font-display text-h2 text-primary">Nuevo movimiento</h2>
+            <h2 className="font-display text-h2 text-primary">
+              {isEdit ? "Editar movimiento" : "Nuevo movimiento"}
+            </h2>
             <p className="text-caption text-muted mt-1">
-              Registra un ingreso, gasto o transferencia
+              {isEdit
+                ? "Modifica los datos del movimiento"
+                : "Registra un ingreso, gasto o transferencia"}
             </p>
           </div>
           <button
@@ -396,7 +412,7 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
             }
             className={`flex-1 text-[13px] font-semibold text-white rounded-md py-2.5 transition-all duration-base ease-standard active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed ${meta.btn}`}
           >
-            {isSaving ? "Guardando…" : meta.label}
+            {isSaving ? "Guardando…" : isEdit ? "Guardar cambios" : meta.label}
           </button>
         </div>
       </div>

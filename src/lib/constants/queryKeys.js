@@ -9,4 +9,5 @@ export const QUERY_KEYS = {
   BUDGETS:          'budgets',
   MERCHANTS:        'merchants',
   TAGS:             'tags',
+  SCHEDULED:        'scheduled',
 }

@@ -7,11 +7,14 @@ import {
   ArrowLeftRight,
   Receipt,
   Calendar,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Sidebar } from "../../../components/Sidebar";
 import { supabase } from "../../../lib/supabaseClient";
 import { formatMoney } from "../../../lib/utils/money";
-import { useMovements } from "../hooks/useMovements";
+import { getMovementDetail } from "../../../lib/services/movements.service";
+import { useMovements, useUpdateMovement, useDeleteMovement } from "../hooks/useMovements";
 import { useCreateMovement } from "../../dashboard/hooks/useCreateMovement";
 import ModalNuevoMovimiento from "../../dashboard/components/ModalNuevoMovimiento";
 
@@ -64,7 +67,7 @@ function formatFecha(dateStr) {
   });
 }
 
-function MovimientoCard({ mov }) {
+function MovimientoCard({ mov, onEdit, onDelete, busy }) {
   const config = TIPO_CONFIG[mov.tipo] ?? TIPO_CONFIG.gasto;
   const { Icon, color, bg, chip, prefix, label } = config;
   const titulo = mov.merchant_name ?? mov.description ?? "Movimiento";
@@ -108,6 +111,27 @@ function MovimientoCard({ mov }) {
           {mov.currency_code ?? "CRC"}
         </div>
       </div>
+
+      <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-base">
+        <button
+          type="button"
+          onClick={onEdit}
+          disabled={busy}
+          className="w-8 h-8 rounded-md flex items-center justify-center text-muted hover:bg-surface hover:text-primary transition-colors duration-base disabled:opacity-50"
+          aria-label="Editar movimiento"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={busy}
+          className="w-8 h-8 rounded-md flex items-center justify-center text-muted hover:bg-danger/10 hover:text-danger transition-colors duration-base disabled:opacity-50"
+          aria-label="Eliminar movimiento"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -116,9 +140,13 @@ export default function Movimientos() {
   const [filter, setFilter] = useState("todos");
   const [search, setSearch] = useState("");
   const [openModal, setOpenModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const { data: movimientos = [], isLoading, isError, error } = useMovements();
   const createMovement = useCreateMovement();
+  const updateMovement = useUpdateMovement();
+  const deleteMovement = useDeleteMovement();
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -130,21 +158,69 @@ export default function Movimientos() {
     });
   }, [movimientos, filter, search]);
 
+  function closeModal() {
+    setOpenModal(false);
+    setEditing(null);
+  }
+
   async function asyncHandleSave(movement) {
     try {
-      await createMovement.mutateAsync({
-        entry_date: new Date().toISOString().slice(0, 10),
-        description: movement.nombre,
-        amount: movement.monto,
-        currency_code: "CRC",
-        debit_account_id: movement.cuentaDestinoId,
-        credit_account_id: movement.cuentaOrigenId,
-        memo: movement.nombre,
-      });
-      setOpenModal(false);
+      if (editing) {
+        await updateMovement.mutateAsync({
+          id: editing.id,
+          entry_date: editing.entry_date,
+          description: movement.nombre,
+          amount: movement.monto,
+          currency_code: editing.currency_code ?? "CRC",
+          debit_account_id: movement.cuentaDestinoId,
+          credit_account_id: movement.cuentaOrigenId,
+          memo: movement.nombre,
+        });
+      } else {
+        await createMovement.mutateAsync({
+          entry_date: new Date().toISOString().slice(0, 10),
+          description: movement.nombre,
+          amount: movement.monto,
+          currency_code: "CRC",
+          debit_account_id: movement.cuentaDestinoId,
+          credit_account_id: movement.cuentaOrigenId,
+          memo: movement.nombre,
+        });
+      }
+      closeModal();
     } catch (e) {
       alert("Error al guardar el movimiento: " + (e.message || String(e)));
     }
+  }
+
+  async function handleEdit(mov) {
+    try {
+      const detail = await getMovementDetail(mov.id);
+      setEditing({
+        id: detail.id,
+        entry_date: detail.entry_date,
+        currency_code: detail.currency_code,
+        // forma que entiende el modal:
+        nombre: detail.description ?? mov.merchant_name ?? "",
+        monto: detail.amount,
+        tipo: mov.tipo,
+        cuentaDestinoId: detail.debit_account_id,
+        cuentaOrigenId: detail.credit_account_id,
+      });
+      setOpenModal(true);
+    } catch (e) {
+      alert("No se pudo cargar el movimiento: " + (e.message || String(e)));
+    }
+  }
+
+  function handleDelete(mov) {
+    const nombre = mov.merchant_name ?? mov.description ?? "este movimiento";
+    if (!window.confirm(`¿Eliminar "${nombre}"? Esta acción no se puede deshacer.`)) return;
+    setDeletingId(mov.id);
+    deleteMovement.mutate(mov.id, {
+      onError: (e) => alert("Error al eliminar: " + (e?.message || String(e))),
+      onSettled: () => setDeletingId(null),
+    });
   }
 
   return (
@@ -178,7 +254,10 @@ export default function Movimientos() {
             </div>
 
             <button
-              onClick={() => setOpenModal(true)}
+              onClick={() => {
+                setEditing(null);
+                setOpenModal(true);
+              }}
               type="button"
               className="group bg-brand-gradient text-white text-[12px] font-semibold rounded-md px-3.5 py-2 flex items-center gap-1.5 hover:shadow-glow-lg active:scale-[0.97] transition-all duration-base ease-standard"
             >
@@ -252,7 +331,13 @@ export default function Movimientos() {
               </div>
               <div className="space-y-2">
                 {filtered.map((mov, i) => (
-                  <MovimientoCard key={mov.id ?? i} mov={mov} />
+                  <MovimientoCard
+                    key={mov.id ?? i}
+                    mov={mov}
+                    busy={deletingId === mov.id}
+                    onEdit={() => handleEdit(mov)}
+                    onDelete={() => handleDelete(mov)}
+                  />
                 ))}
               </div>
             </>
@@ -261,9 +346,10 @@ export default function Movimientos() {
 
         <ModalNuevoMovimiento
           isOpen={openModal}
-          onClose={() => setOpenModal(false)}
+          onClose={closeModal}
           onSave={asyncHandleSave}
-          isSaving={createMovement.isPending}
+          isSaving={createMovement.isPending || updateMovement.isPending}
+          initial={editing}
         />
       </div>
     </div>
