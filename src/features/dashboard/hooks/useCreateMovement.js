@@ -9,6 +9,7 @@ export function useCreateMovement() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [QUERY_KEYS.DASHBOARD_REPORT] });
       qc.invalidateQueries({ queryKey: [QUERY_KEYS.RECENT_MOVEMENTS] });
+      qc.invalidateQueries({ queryKey: [QUERY_KEYS.JOURNAL_ENTRIES] });
       qc.invalidateQueries({ queryKey: [QUERY_KEYS.ACCOUNTS] });
     },
   });

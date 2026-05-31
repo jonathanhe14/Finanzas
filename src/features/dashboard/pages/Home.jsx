@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Search, ChevronRight, ChevronLeft } from "lucide-react";
 import { supabase } from "../../../lib/supabaseClient";
@@ -12,6 +12,9 @@ import ModalNuevoMovimiento from "../components/ModalNuevoMovimiento";
 import { useDashboardReport } from "../hooks/useDashboardReport";
 import { useRecentEntries } from "../hooks/useRecentEntries";
 import { useCreateMovement } from "../hooks/useCreateMovement";
+import { useAccountsList } from "../../accounts/hooks/useAccountsList";
+import { useMonthlyBudget, useExpenseSpent } from "../../budgets/hooks/useBudgets";
+import { getCurrentMonthRange } from "../../../lib/utils/dates";
 
 const handleLogout = () => {
   supabase.auth.signOut();
@@ -35,6 +38,24 @@ function Home() {
 
   const { data: dashboardData } = useDashboardReport();
   const { data: recentEntries = [] } = useRecentEntries();
+  const { data: accounts = [] } = useAccountsList();
+  const { data: budget } = useMonthlyBudget();
+  const monthRange = getCurrentMonthRange();
+  const { data: spentMap = {} } = useExpenseSpent(monthRange.from, monthRange.to);
+
+  const presupuestos = useMemo(() => {
+    if (!budget?.budget_line?.length) return [];
+    const nameById = Object.fromEntries(accounts.map((a) => [a.id, a.name]));
+    return budget.budget_line
+      .filter((line) => Number(line.limit_amount) > 0)
+      .map((line) => ({
+        categoria: nameById[line.account_id] ?? "Categoría",
+        gastado: Number(spentMap[line.account_id] ?? 0),
+        presupuestado: Number(line.limit_amount),
+      }))
+      .sort((a, b) => b.gastado / b.presupuestado - a.gastado / a.presupuestado)
+      .slice(0, 5);
+  }, [budget, accounts, spentMap]);
 
   async function asyncHandleSave(movement) {
     try {
@@ -160,14 +181,7 @@ function Home() {
             </div>
 
             <div className="lg:col-span-4">
-              <CardPresupuesto
-                presupuestos={[
-                  { categoria: "Alimentación", gastado: 320, presupuestado: 450 },
-                  { categoria: "Transporte", gastado: 210, presupuestado: 200 },
-                  { categoria: "Entretenimiento", gastado: 80, presupuestado: 100 },
-                  { categoria: "Salud", gastado: 175, presupuestado: 180 },
-                ]}
-              />
+              <CardPresupuesto presupuestos={presupuestos} />
             </div>
           </div>
         </main>

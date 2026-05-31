@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { formatMoney } from "../../../lib/utils/money";
 
 export function CardPresupuesto({ presupuestos = [], currency = "CRC" }) {
@@ -5,9 +6,12 @@ export function CardPresupuesto({ presupuestos = [], currency = "CRC" }) {
     <div className="bg-surface border border-default rounded-2xl p-5 shadow-card animate-fade-up">
       <div className="flex items-center justify-between mb-4">
         <span className="text-h3 text-primary">Progreso de presupuestos</span>
-        <a className="text-caption text-muted hover:text-accent font-medium cursor-pointer transition-colors duration-base">
+        <Link
+          to="/presupuesto"
+          className="text-caption text-muted hover:text-accent font-medium cursor-pointer transition-colors duration-base"
+        >
           Ver todos →
-        </a>
+        </Link>
       </div>
 
       {presupuestos.length === 0 ? (

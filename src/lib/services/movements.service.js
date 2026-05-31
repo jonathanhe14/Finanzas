@@ -1,6 +1,20 @@
 import { supabase } from "../supabaseClient";
 
 /**
+ * Lista los movimientos del usuario (más recientes primero).
+ * Reutiliza el RPC `get_recent_entries`, que ya calcula el campo `tipo`
+ * (gasto / ingreso / transferencia) y devuelve los datos enriquecidos.
+ */
+export async function listMovements(limit = 200) {
+  const { data, error } = await supabase.rpc("get_recent_entries", {
+    p_limit: limit,
+  });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
  * Crea un journal_entry con dos postings balanceados (double-entry).
  * Por convención:
  *  - debitAccountId: cuenta que recibe (suma para ASSET/EXPENSE)
