@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Wallet, CreditCard, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { useCreateAccount, useCurrencies } from "../hooks/useAccountsList";
+import { useModalTransition } from "../../../lib/hooks/useModalTransition";
 
 const TYPE_OPTIONS = {
   cuenta: [
@@ -22,8 +23,8 @@ const DEFAULT_FORM = {
 
 export default function ModalNuevaCuenta({ isOpen, onClose, mode = "cuenta" }) {
   const [form, setForm] = useState(DEFAULT_FORM);
-  const [visible, setVisible] = useState(false);
   const [error, setError] = useState(null);
+  const visible = useModalTransition(isOpen);
 
   const { data: currencies = [] } = useCurrencies();
   const createMutation = useCreateAccount();
@@ -31,16 +32,14 @@ export default function ModalNuevaCuenta({ isOpen, onClose, mode = "cuenta" }) {
   const typeOptions = TYPE_OPTIONS[mode];
   const isCategoria = mode === "categoria";
 
-  useEffect(() => {
-    if (isOpen) {
-      setVisible(true);
-      setForm({ ...DEFAULT_FORM, type: typeOptions[0].value });
-      setError(null);
-    } else {
-      const t = setTimeout(() => setVisible(false), 280);
-      return () => clearTimeout(t);
-    }
-  }, [isOpen, mode]);
+  // Reset del formulario al abrir (ajuste de estado en render).
+  const [prevOpen, setPrevOpen] = useState(false);
+  if (isOpen && !prevOpen) {
+    setPrevOpen(true);
+    setForm({ ...DEFAULT_FORM, type: typeOptions[0].value });
+    setError(null);
+  }
+  if (!isOpen && prevOpen) setPrevOpen(false);
 
   const handleKey = useCallback(
     (e) => {

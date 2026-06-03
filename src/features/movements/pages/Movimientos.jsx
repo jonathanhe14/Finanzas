@@ -9,14 +9,18 @@ import {
   Calendar,
   Pencil,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Sidebar } from "../../../components/Sidebar";
 import { supabase } from "../../../lib/supabaseClient";
 import { formatMoney } from "../../../lib/utils/money";
 import { getMovementDetail } from "../../../lib/services/movements.service";
 import { useMovements, useUpdateMovement, useDeleteMovement } from "../hooks/useMovements";
+import { useTags } from "../hooks/useTags";
 import { useCreateMovement } from "../../dashboard/hooks/useCreateMovement";
 import ModalNuevoMovimiento from "../../dashboard/components/ModalNuevoMovimiento";
+import { useToast } from "../../../components/ToastProvider";
 
 const TIPO_CONFIG = {
   gasto: {
@@ -100,6 +104,18 @@ function MovimientoCard({ mov, onEdit, onDelete, busy }) {
             </span>
           )}
         </div>
+        {mov.tags?.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {mov.tags.map((t) => (
+              <span
+                key={t.id}
+                className="text-[10px] font-medium text-accent bg-accent/10 border border-accent/30 px-1.5 py-0.5 rounded-full"
+              >
+                #{t.name}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="text-right">
@@ -139,6 +155,9 @@ function MovimientoCard({ mov, onEdit, onDelete, busy }) {
 export default function Movimientos() {
   const [filter, setFilter] = useState("todos");
   const [search, setSearch] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [selectedTag, setSelectedTag] = useState(null);
   const [openModal, setOpenModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -147,16 +166,34 @@ export default function Movimientos() {
   const createMovement = useCreateMovement();
   const updateMovement = useUpdateMovement();
   const deleteMovement = useDeleteMovement();
+  const { data: allTags = [] } = useTags();
+  const toast = useToast();
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return movimientos.filter((m) => {
       if (filter !== "todos" && m.tipo !== filter) return false;
+      if (fechaDesde && m.entry_date < fechaDesde) return false;
+      if (fechaHasta && m.entry_date > fechaHasta) return false;
+      if (selectedTag && !(m.tags ?? []).some((t) => t.id === selectedTag)) return false;
       if (!term) return true;
       const haystack = `${m.merchant_name ?? ""} ${m.description ?? ""}`.toLowerCase();
       return haystack.includes(term);
     });
-  }, [movimientos, filter, search]);
+  }, [movimientos, filter, search, fechaDesde, fechaHasta, selectedTag]);
+
+  // Paginación (cliente) sobre la lista filtrada.
+  const PAGE_SIZE = 15;
+  const [page, setPage] = useState(1);
+  const filterSig = `${filter}|${search}|${fechaDesde}|${fechaHasta}|${selectedTag}`;
+  const [prevSig, setPrevSig] = useState(filterSig);
+  if (filterSig !== prevSig) {
+    setPrevSig(filterSig);
+    setPage(1);
+  }
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function closeModal() {
     setOpenModal(false);
@@ -175,6 +212,7 @@ export default function Movimientos() {
           debit_account_id: movement.cuentaDestinoId,
           credit_account_id: movement.cuentaOrigenId,
           memo: movement.nombre,
+          tags: movement.tags,
         });
       } else {
         await createMovement.mutateAsync({
@@ -185,11 +223,13 @@ export default function Movimientos() {
           debit_account_id: movement.cuentaDestinoId,
           credit_account_id: movement.cuentaOrigenId,
           memo: movement.nombre,
+          tags: movement.tags,
         });
       }
       closeModal();
+      toast.success(editing ? "Movimiento actualizado" : "Movimiento creado");
     } catch (e) {
-      alert("Error al guardar el movimiento: " + (e.message || String(e)));
+      toast.error("Error al guardar el movimiento: " + (e.message || String(e)));
     }
   }
 
@@ -206,10 +246,11 @@ export default function Movimientos() {
         tipo: mov.tipo,
         cuentaDestinoId: detail.debit_account_id,
         cuentaOrigenId: detail.credit_account_id,
+        tags: (mov.tags ?? []).map((t) => t.id),
       });
       setOpenModal(true);
     } catch (e) {
-      alert("No se pudo cargar el movimiento: " + (e.message || String(e)));
+      toast.error("No se pudo cargar el movimiento: " + (e.message || String(e)));
     }
   }
 
@@ -218,7 +259,8 @@ export default function Movimientos() {
     if (!window.confirm(`¿Eliminar "${nombre}"? Esta acción no se puede deshacer.`)) return;
     setDeletingId(mov.id);
     deleteMovement.mutate(mov.id, {
-      onError: (e) => alert("Error al eliminar: " + (e?.message || String(e))),
+      onSuccess: () => toast.success("Movimiento eliminado"),
+      onError: (e) => toast.error("Error al eliminar: " + (e?.message || String(e))),
       onSettled: () => setDeletingId(null),
     });
   }
@@ -228,7 +270,7 @@ export default function Movimientos() {
       <Sidebar handleLogout={handleLogout} />
 
       <div className="ml-[64px] flex flex-col min-h-screen">
-        <header className="relative h-16 glass-panel border-b border-default flex items-center justify-between px-6 sticky top-0 z-30">
+        <header className="relative min-h-16 glass-panel border-b border-default flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-2.5 sm:py-0 sm:h-16 sticky top-0 z-30">
           <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent pointer-events-none" />
 
           <div>
@@ -242,7 +284,7 @@ export default function Movimientos() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            <div className="hidden md:flex items-center gap-2 bg-surface border border-default rounded-md px-3 py-1.5 w-44 focus-within:border-accent focus-within:shadow-focus transition-all duration-base">
+            <div className="flex items-center gap-2 bg-surface border border-default rounded-md px-3 py-1.5 w-44 focus-within:border-accent focus-within:shadow-focus transition-all duration-base">
               <Search className="w-3.5 h-3.5 text-faint" />
               <input
                 type="text"
@@ -270,23 +312,81 @@ export default function Movimientos() {
           </div>
         </header>
 
-        <main className="p-6 lg:p-8 max-w-4xl w-full mx-auto flex-1 animate-fade-up">
-          <div className="inline-flex bg-surface p-1 rounded-xl mb-6 border border-default">
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFilter(f.id)}
-                className={`px-4 py-1.5 text-[12px] font-semibold rounded-lg transition-all duration-base ease-standard ${
-                  filter === f.id
-                    ? "bg-elevated text-primary shadow-sm"
-                    : "text-muted hover:text-primary"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+        <main className="p-4 sm:p-6 lg:p-8 max-w-4xl w-full mx-auto flex-1 animate-fade-up">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div className="inline-flex bg-surface p-1 rounded-xl border border-default">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setFilter(f.id)}
+                  className={`px-4 py-1.5 text-[12px] font-semibold rounded-lg transition-all duration-base ease-standard ${
+                    filter === f.id
+                      ? "bg-elevated text-primary shadow-sm"
+                      : "text-muted hover:text-primary"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1.5 text-[12px] text-muted">
+                Desde
+                <input
+                  type="date"
+                  value={fechaDesde}
+                  onChange={(e) => setFechaDesde(e.target.value)}
+                  className="bg-surface border border-default rounded-md px-2.5 py-1.5 text-[12px] text-primary outline-none focus:border-accent focus:shadow-focus transition-all duration-base [color-scheme:dark]"
+                />
+              </label>
+              <label className="flex items-center gap-1.5 text-[12px] text-muted">
+                Hasta
+                <input
+                  type="date"
+                  value={fechaHasta}
+                  onChange={(e) => setFechaHasta(e.target.value)}
+                  className="bg-surface border border-default rounded-md px-2.5 py-1.5 text-[12px] text-primary outline-none focus:border-accent focus:shadow-focus transition-all duration-base [color-scheme:dark]"
+                />
+              </label>
+              {(fechaDesde || fechaHasta) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFechaDesde("");
+                    setFechaHasta("");
+                  }}
+                  className="text-[12px] font-medium text-muted hover:text-primary transition-colors duration-base px-2 py-1.5"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
           </div>
+
+          {allTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mb-5 -mt-2">
+              <span className="text-[11px] text-faint mr-1">Etiquetas:</span>
+              {allTags.map((t) => {
+                const active = selectedTag === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSelectedTag(active ? null : t.id)}
+                    className={`text-[11px] font-medium border px-2.5 py-1 rounded-full transition-colors duration-base ${
+                      active
+                        ? "bg-accent/15 text-accent border-accent/40"
+                        : "text-muted border-default hover:text-primary hover:border-strong"
+                    }`}
+                  >
+                    #{t.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {isLoading && (
             <div className="space-y-2">
@@ -309,12 +409,12 @@ export default function Movimientos() {
                 <Receipt className="w-5 h-5 text-muted" strokeWidth={1.75} />
               </div>
               <p className="text-sm text-primary font-medium">
-                {search || filter !== "todos"
+                {search || filter !== "todos" || fechaDesde || fechaHasta || selectedTag
                   ? "No hay movimientos que coincidan"
                   : "Aún no hay movimientos"}
               </p>
               <p className="text-caption text-muted mt-1">
-                {search || filter !== "todos"
+                {search || filter !== "todos" || fechaDesde || fechaHasta || selectedTag
                   ? "Prueba con otro filtro o término de búsqueda"
                   : "Registra tu primer ingreso o gasto"}
               </p>
@@ -328,9 +428,14 @@ export default function Movimientos() {
                   {filtered.length}{" "}
                   {filtered.length === 1 ? "movimiento" : "movimientos"}
                 </span>
+                {totalPages > 1 && (
+                  <span className="text-caption text-muted">
+                    Página {safePage} de {totalPages}
+                  </span>
+                )}
               </div>
               <div className="space-y-2">
-                {filtered.map((mov, i) => (
+                {pageItems.map((mov, i) => (
                   <MovimientoCard
                     key={mov.id ?? i}
                     mov={mov}
@@ -340,6 +445,32 @@ export default function Movimientos() {
                   />
                 ))}
               </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-5">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={safePage <= 1}
+                    className="flex items-center gap-1 text-[12px] font-medium text-secondary bg-surface border border-default rounded-md px-3 py-1.5 hover:bg-elevated hover:text-primary transition-colors duration-base disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    Anterior
+                  </button>
+                  <span className="num-chip text-[12px] text-muted px-2">
+                    {safePage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safePage >= totalPages}
+                    className="flex items-center gap-1 text-[12px] font-medium text-secondary bg-surface border border-default rounded-md px-3 py-1.5 hover:bg-elevated hover:text-primary transition-colors duration-base disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Siguiente
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </>
           )}
         </main>

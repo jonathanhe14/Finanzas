@@ -1,5 +1,7 @@
 export const QUERY_KEYS = {
   DASHBOARD_REPORT: 'dashboard-report',
+  MONTHLY_TOTALS:   'monthly-totals',
+  EXPENSE_BY_CATEGORY: 'expense-by-category',
   ACCOUNT_BALANCES: 'account-balances',
   RECENT_MOVEMENTS: 'recent-movements',
   BUDGET_PROGRESS:  'budget-progress',
@@ -10,4 +12,5 @@ export const QUERY_KEYS = {
   MERCHANTS:        'merchants',
   TAGS:             'tags',
   SCHEDULED:        'scheduled',
+  GOALS:            'goals',
 }

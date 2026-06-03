@@ -158,7 +158,7 @@ export default function Cuentas() {
       <Sidebar handleLogout={handleLogout} />
 
       <div className="ml-[64px] flex flex-col min-h-screen">
-        <header className="h-16 glass-panel border-b border-default flex items-center justify-between px-6 sticky top-0 z-30">
+        <header className="min-h-16 glass-panel border-b border-default flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-2.5 sm:py-0 sm:h-16 sticky top-0 z-30">
           <div>
             <h1 className="font-display text-h2 text-primary">Cuentas y categorías</h1>
             <p className="text-caption text-muted -mt-0.5">
@@ -178,7 +178,7 @@ export default function Cuentas() {
           </button>
         </header>
 
-        <main className="p-6 lg:p-8 max-w-4xl w-full mx-auto flex-1 animate-fade-up">
+        <main className="p-4 sm:p-6 lg:p-8 max-w-4xl w-full mx-auto flex-1 animate-fade-up">
           <div className="inline-flex bg-surface p-1 rounded-xl mb-6 border border-default">
             {[
               { id: "cuenta", label: "Cuentas" },

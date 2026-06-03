@@ -4,6 +4,7 @@ import {
   listCurrencies,
   createAccount,
   archiveAccount,
+  getAccountBalances,
 } from "../../../lib/services/accounts.service";
 import { QUERY_KEYS } from "../../../lib/constants/queryKeys";
 
@@ -11,6 +12,14 @@ export function useAccountsList() {
   return useQuery({
     queryKey: [QUERY_KEYS.ACCOUNTS],
     queryFn: listAccounts,
+    staleTime: 1000 * 60 * 2,
+  });
+}
+
+export function useAccountBalances() {
+  return useQuery({
+    queryKey: [QUERY_KEYS.ACCOUNT_BALANCES],
+    queryFn: getAccountBalances,
     staleTime: 1000 * 60 * 2,
   });
 }

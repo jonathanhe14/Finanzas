@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Repeat, Landmark, CreditCard } from "lucide-react";
 import { useAccountsList } from "../../accounts/hooks/useAccountsList";
+import { useModalTransition } from "../../../lib/hooks/useModalTransition";
 import {
   useCreateScheduledEntry,
   useUpdateScheduledEntry,
@@ -46,8 +47,8 @@ const selectStyle = {
 export default function ModalGastoFijo({ isOpen, onClose, entry = null }) {
   const isEdit = !!entry;
   const [form, setForm] = useState(DEFAULT_FORM);
-  const [visible, setVisible] = useState(false);
   const [error, setError] = useState(null);
+  const visible = useModalTransition(isOpen);
 
   const { data: accounts = [] } = useAccountsList();
   const createMutation = useCreateScheduledEntry();
@@ -57,39 +58,38 @@ export default function ModalGastoFijo({ isOpen, onClose, entry = null }) {
   const expenseAccounts = accounts.filter((a) => a.type === "EXPENSE");
   const paymentAccounts = accounts.filter((a) => a.type === "ASSET" || a.type === "LIABILITY");
 
-  // Reinicia el formulario al abrir / mantiene montado durante la animación de cierre.
-  useEffect(() => {
-    if (isOpen) {
-      setVisible(true);
-      setError(null);
-      setForm(
-        isEdit
-          ? {
-              name: entry.name ?? "",
-              type: entry.type ?? "SUBSCRIPTION",
-              expense_account_id: "",
-              payment_account_id: "",
-              installment_amount: entry.installment_amount ?? "",
-              total_installments: entry.total_installments ?? "",
-              total_amount: entry.total_amount ?? "",
-              next_run_date: (entry.next_run_date ?? today()).slice(0, 10),
-              start_date: (entry.start_date ?? today()).slice(0, 10),
-              rrule: entry.rrule ?? "FREQ=MONTHLY",
-              description: entry.description ?? "",
-            }
-          : DEFAULT_FORM,
-      );
-      return undefined;
-    }
-    const t = setTimeout(() => setVisible(false), 280);
-    return () => clearTimeout(t);
-  }, [isOpen, entry, isEdit]);
+  // Reinicia el formulario al abrir (ajuste de estado en render).
+  const [prevOpen, setPrevOpen] = useState(false);
+  if (isOpen && !prevOpen) {
+    setPrevOpen(true);
+    setError(null);
+    setForm(
+      isEdit
+        ? {
+            name: entry.name ?? "",
+            type: entry.type ?? "SUBSCRIPTION",
+            expense_account_id: "",
+            payment_account_id: "",
+            installment_amount: entry.installment_amount ?? "",
+            total_installments: entry.total_installments ?? "",
+            total_amount: entry.total_amount ?? "",
+            next_run_date: (entry.next_run_date ?? today()).slice(0, 10),
+            start_date: (entry.start_date ?? today()).slice(0, 10),
+            rrule: entry.rrule ?? "FREQ=MONTHLY",
+            description: entry.description ?? "",
+          }
+        : DEFAULT_FORM,
+    );
+  }
+  if (!isOpen && prevOpen) setPrevOpen(false);
 
   // Prefill de las cuentas cuando llegan los postings (sólo en edición).
+  // Es una sincronización legítima con datos async, por eso el setState va en efecto.
   useEffect(() => {
     if (!isOpen || !isEdit || !postings.length) return;
     const debit = postings.find((p) => Number(p.debit) > 0);
     const credit = postings.find((p) => Number(p.credit) > 0);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm((f) => ({
       ...f,
       expense_account_id: f.expense_account_id || String(debit?.account_id ?? ""),

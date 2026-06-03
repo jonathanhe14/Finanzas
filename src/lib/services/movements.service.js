@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient";
+import { setEntryTags } from "./tags.service";
 
 /**
  * Lista los movimientos del usuario (más recientes primero).
@@ -11,7 +12,9 @@ export async function listMovements(limit = 200) {
   });
 
   if (error) throw error;
-  return data ?? [];
+  // El RPC devuelve `entry_id`; exponemos también `id` para que la UI
+  // (editar/borrar, keys de React) pueda identificar cada movimiento.
+  return (data ?? []).map((row) => ({ ...row, id: row.entry_id }));
 }
 
 /**
@@ -30,6 +33,7 @@ export async function createMovement({
   memo = null,
   merchant_id = null,
   status = "CLEARED",
+  tags,
 }) {
   if (!debit_account_id || !credit_account_id) {
     throw new Error("Faltan las cuentas de débito o crédito");
@@ -80,6 +84,8 @@ export async function createMovement({
     await supabase.from("journal_entries").delete().eq("id", entry.id);
     throw postErr;
   }
+
+  if (Array.isArray(tags)) await setEntryTags(entry.id, tags);
 
   return entry.id;
 }
@@ -132,6 +138,7 @@ export async function updateMovement({
   debit_account_id,
   credit_account_id,
   memo = null,
+  tags,
 }) {
   if (!id) throw new Error("Falta el id del movimiento");
   if (!debit_account_id || !credit_account_id) {
@@ -161,6 +168,9 @@ export async function updateMovement({
   ]);
 
   if (insErr) throw insErr;
+
+  if (Array.isArray(tags)) await setEntryTags(id, tags);
+
   return id;
 }
 

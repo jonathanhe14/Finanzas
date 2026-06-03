@@ -4,6 +4,8 @@ import {
   LayoutDashboard,
   ArrowRightLeft,
   ChartLine,
+  BarChart3,
+  Target,
   Wallet,
   LogOut,
 } from "lucide-react";
@@ -12,7 +14,9 @@ const MENU = [
   { id: 1, name: "Dashboard", icon: LayoutDashboard, path: "/home" },
   { id: 2, name: "Movimientos", icon: ArrowRightLeft, path: "/movimientos" },
   { id: 3, name: "Presupuestos", icon: ChartLine, path: "/presupuesto" },
-  { id: 4, name: "Cuentas", icon: Wallet, path: "/cuentas" },
+  { id: 4, name: "Reportes", icon: BarChart3, path: "/reportes" },
+  { id: 5, name: "Metas", icon: Target, path: "/metas" },
+  { id: 6, name: "Cuentas", icon: Wallet, path: "/cuentas" },
 ];
 
 export const Sidebar = ({ handleLogout }) => {

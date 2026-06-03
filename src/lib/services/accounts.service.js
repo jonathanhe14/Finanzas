@@ -12,6 +12,21 @@ export async function listAccounts() {
   return data ?? [];
 }
 
+/**
+ * Saldo actual por cuenta (desde la vista v_account_balances, ya filtrada por RLS).
+ * Devuelve un mapa { [account_id]: balance }.
+ */
+export async function getAccountBalances() {
+  const { data, error } = await supabase
+    .from("v_account_balances")
+    .select("account_id, balance");
+
+  if (error) throw error;
+  const map = {};
+  for (const row of data ?? []) map[row.account_id] = Number(row.balance) || 0;
+  return map;
+}
+
 export async function listCurrencies() {
   const { data, error } = await supabase
     .from("currencies")

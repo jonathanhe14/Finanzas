@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { X, TrendingDown, TrendingUp, ArrowRight } from "lucide-react";
 import { useAccountsList } from "../../accounts/hooks/useAccountsList";
+import { useModalTransition } from "../../../lib/hooks/useModalTransition";
+import { useTags, useCreateTag } from "../../movements/hooks/useTags";
 
 const TYPE_META = {
   gasto: {
@@ -76,14 +78,18 @@ const defaultForm = {
   tipo: "gasto",
   cuentaOrigenId: "",
   cuentaDestinoId: "",
+  tags: [],
 };
 
 export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving = false, initial = null }) {
   const isEdit = !!initial;
   const [form, setForm] = useState(defaultForm);
-  const [visible, setVisible] = useState(false);
+  const visible = useModalTransition(isOpen);
 
   const { data: accounts = [], isLoading: loadingAccounts } = useAccountsList();
+  const { data: allTags = [] } = useTags();
+  const createTag = useCreateTag();
+  const [newTag, setNewTag] = useState("");
 
   const { paymentAccounts, expenseCategories, incomeCategories } = useMemo(() => {
     return {
@@ -93,28 +99,24 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
     };
   }, [accounts]);
 
-  useEffect(() => {
-    if (isOpen) setVisible(true);
-    else {
-      const t = setTimeout(() => setVisible(false), 280);
-      return () => clearTimeout(t);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    if (initial) {
-      setForm({
-        nombre: initial.nombre ?? "",
-        monto: initial.monto != null ? String(initial.monto) : "",
-        tipo: initial.tipo ?? "gasto",
-        cuentaOrigenId: initial.cuentaOrigenId != null ? String(initial.cuentaOrigenId) : "",
-        cuentaDestinoId: initial.cuentaDestinoId != null ? String(initial.cuentaDestinoId) : "",
-      });
-    } else {
-      setForm(defaultForm);
-    }
-  }, [isOpen, initial]);
+  // Reset del formulario al abrir (ajuste de estado en render).
+  const [prevOpen, setPrevOpen] = useState(false);
+  if (isOpen && !prevOpen) {
+    setPrevOpen(true);
+    setForm(
+      initial
+        ? {
+            nombre: initial.nombre ?? "",
+            monto: initial.monto != null ? String(initial.monto) : "",
+            tipo: initial.tipo ?? "gasto",
+            cuentaOrigenId: initial.cuentaOrigenId != null ? String(initial.cuentaOrigenId) : "",
+            cuentaDestinoId: initial.cuentaDestinoId != null ? String(initial.cuentaDestinoId) : "",
+            tags: initial.tags ?? [],
+          }
+        : defaultForm,
+    );
+  }
+  if (!isOpen && prevOpen) setPrevOpen(false);
 
   const handleKey = useCallback(
     (e) => {
@@ -151,6 +153,24 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
   }
 
   const accOptions = (list) => list.map((a) => ({ value: String(a.id), label: a.name }));
+
+  const toggleTag = (id) =>
+    setForm((f) => ({
+      ...f,
+      tags: f.tags.includes(id) ? f.tags.filter((t) => t !== id) : [...f.tags, id],
+    }));
+
+  async function addTag() {
+    const name = newTag.trim();
+    if (!name) return;
+    try {
+      const t = await createTag.mutateAsync(name);
+      setForm((f) => ({ ...f, tags: [...f.tags, t.id] }));
+      setNewTag("");
+    } catch {
+      /* el error se ignora aquí; el nombre queda para reintentar */
+    }
+  }
 
   return (
     <div
@@ -390,6 +410,55 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
               </div>
             </div>
           )}
+
+          <div>
+            <FieldLabel>Etiquetas</FieldLabel>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {allTags.length === 0 && (
+                <span className="text-caption text-faint">Sin etiquetas aún — crea una abajo</span>
+              )}
+              {allTags.map((t) => {
+                const active = form.tags.includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggleTag(t.id)}
+                    className={`text-[11px] font-medium border px-2.5 py-1 rounded-full transition-colors duration-base ${
+                      active
+                        ? "bg-accent/15 text-accent border-accent/40"
+                        : "text-muted border-default hover:text-primary hover:border-strong"
+                    }`}
+                  >
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addTag();
+                  }
+                }}
+                placeholder="Nueva etiqueta…"
+                className="flex-1 bg-sunken border border-default rounded-md px-3 py-2 text-[12px] text-primary placeholder:text-faint focus:outline-none focus:border-accent transition-all duration-base"
+              />
+              <button
+                type="button"
+                onClick={addTag}
+                disabled={!newTag.trim() || createTag.isPending}
+                className="text-[12px] font-medium text-secondary bg-elevated border border-default rounded-md px-3 py-2 hover:text-primary transition-colors duration-base disabled:opacity-40"
+              >
+                Agregar
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="px-6 pb-6 pt-4 flex gap-2.5 border-t border-default">

@@ -14,6 +14,7 @@ import {
 } from "../hooks/useBudgets";
 import { BudgetRow } from "../components/BudgetRow";
 import { FixedExpensesTab } from "../components/FixedExpensesTab";
+import { useToast } from "../../../components/ToastProvider";
 
 const handleLogout = () => {
   supabase.auth.signOut();
@@ -41,6 +42,7 @@ export default function Presupuestos() {
   const { data: spentMap = {}, isLoading: loadingSpent } = useExpenseSpent(from, to);
   const upsertLine = useUpsertBudgetLine();
   const createBudget = useCreateMonthlyBudget();
+  const toast = useToast();
 
   const isLoading = loadingAccounts || loadingBudget || loadingSpent;
 
@@ -92,13 +94,13 @@ export default function Presupuestos() {
     if (!budget?.id) return;
     upsertLine.mutate(
       { budget_id: budget.id, account_id, limit_amount },
-      { onError: (e) => alert("Error al guardar el límite: " + (e?.message || String(e))) },
+      { onError: (e) => toast.error("Error al guardar el límite: " + (e?.message || String(e))) },
     );
   }
 
   function handleCreateBudget() {
     createBudget.mutate(undefined, {
-      onError: (e) => alert("Error al crear el presupuesto: " + (e?.message || String(e))),
+      onError: (e) => toast.error("Error al crear el presupuesto: " + (e?.message || String(e))),
     });
   }
 
@@ -107,7 +109,7 @@ export default function Presupuestos() {
       <Sidebar handleLogout={handleLogout} />
 
       <div className="ml-[64px] flex flex-col min-h-screen">
-        <header className="relative h-16 glass-panel border-b border-default flex items-center justify-between px-6 sticky top-0 z-30">
+        <header className="relative min-h-16 glass-panel border-b border-default flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-2.5 sm:py-0 sm:h-16 sticky top-0 z-30">
           <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent pointer-events-none" />
 
           <div>
@@ -167,7 +169,7 @@ export default function Presupuestos() {
           </div>
         </header>
 
-        <main className="p-6 lg:p-8 max-w-4xl w-full mx-auto flex-1 animate-fade-up">
+        <main className="p-4 sm:p-6 lg:p-8 max-w-4xl w-full mx-auto flex-1 animate-fade-up">
           {tab === "fijos" && <FixedExpensesTab />}
 
           {tab === "categorias" && (

@@ -8,6 +8,7 @@ import {
 } from "../hooks/useScheduled";
 import { FixedExpenseCard } from "./FixedExpenseCard";
 import ModalGastoFijo from "./ModalGastoFijo";
+import { useToast } from "../../../components/ToastProvider";
 
 function StatTile({ label, value, tone }) {
   const valueClass = tone === "danger" ? "text-danger" : "text-primary";
@@ -23,6 +24,7 @@ export function FixedExpensesTab() {
   const { data: entries = [], isLoading, isError, error } = useScheduledEntries();
   const payMutation = usePostScheduledEntry();
   const setActive = useSetScheduledActive();
+  const toast = useToast();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -62,7 +64,8 @@ export function FixedExpensesTab() {
     payMutation.mutate(
       { id: entry.id },
       {
-        onError: (e) => alert("Error al registrar el pago: " + (e?.message || String(e))),
+        onSuccess: () => toast.success("Pago registrado"),
+        onError: (e) => toast.error("Error al registrar el pago: " + (e?.message || String(e))),
         onSettled: () => setPayingId(null),
       },
     );
@@ -72,7 +75,7 @@ export function FixedExpensesTab() {
     if (!window.confirm(`¿Pausar "${entry.name}"? Dejará de aparecer en la lista.`)) return;
     setActive.mutate(
       { id: entry.id, is_active: false },
-      { onError: (e) => alert("Error al pausar: " + (e?.message || String(e))) },
+      { onError: (e) => toast.error("Error al pausar: " + (e?.message || String(e))) },
     );
   }
 

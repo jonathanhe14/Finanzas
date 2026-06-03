@@ -32,11 +32,11 @@ export async function getScheduledPostings(scheduled_id) {
 /**
  * Construye las 2 líneas (débito en la cuenta de gasto, crédito en la cuenta que paga).
  */
-function buildPostings(scheduled_id, { expense_account_id, payment_account_id, installment_amount, memo = null }) {
+function buildPostings(scheduled_id, { expense_account_id, payment_account_id, installment_amount, memo = null }, user_id = null) {
   const amt = Number(installment_amount) || 0;
   return [
-    { scheduled_id, account_id: expense_account_id, debit: amt, credit: 0, memo },
-    { scheduled_id, account_id: payment_account_id, debit: 0, credit: amt, memo },
+    { scheduled_id, account_id: expense_account_id, debit: amt, credit: 0, memo, user_id },
+    { scheduled_id, account_id: payment_account_id, debit: 0, credit: amt, memo, user_id },
   ];
 }
 
@@ -67,6 +67,9 @@ export async function createScheduledEntry({
     throw new Error("El monto por cuota debe ser mayor a 0");
   }
 
+  const { data: userData } = await supabase.auth.getUser();
+  const user_id = userData?.user?.id ?? null;
+
   const { data: entry, error: entryErr } = await supabase
     .from("scheduled_entries")
     .insert({
@@ -83,6 +86,7 @@ export async function createScheduledEntry({
       completed_installments: 0,
       installment_amount: Number(installment_amount),
       total_amount: total_amount == null || total_amount === "" ? null : Number(total_amount),
+      user_id,
     })
     .select("id")
     .single();
@@ -91,7 +95,7 @@ export async function createScheduledEntry({
 
   const { error: postErr } = await supabase
     .from("scheduled_postings")
-    .insert(buildPostings(entry.id, { expense_account_id, payment_account_id, installment_amount }));
+    .insert(buildPostings(entry.id, { expense_account_id, payment_account_id, installment_amount }, user_id));
 
   if (postErr) {
     await supabase.from("scheduled_entries").delete().eq("id", entry.id);
@@ -118,6 +122,9 @@ export async function updateScheduledEntry(id, {
   expense_account_id,
   payment_account_id,
 }) {
+  const { data: userData } = await supabase.auth.getUser();
+  const user_id = userData?.user?.id ?? null;
+
   const { error: updErr } = await supabase
     .from("scheduled_entries")
     .update({
@@ -145,7 +152,7 @@ export async function updateScheduledEntry(id, {
 
   const { error: insErr } = await supabase
     .from("scheduled_postings")
-    .insert(buildPostings(id, { expense_account_id, payment_account_id, installment_amount }));
+    .insert(buildPostings(id, { expense_account_id, payment_account_id, installment_amount }, user_id));
 
   if (insErr) throw insErr;
 

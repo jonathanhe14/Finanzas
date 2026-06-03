@@ -18,6 +18,25 @@ const Login = () => {
     setFeedback(null);
   };
 
+  const handleForgot = async () => {
+    if (!email) {
+      setFeedback({ type: "error", message: "Ingresá tu correo para enviarte el enlace." });
+      return;
+    }
+    setIsLoading(true);
+    setFeedback(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + "/reset",
+    });
+    setIsLoading(false);
+    if (error) setFeedback({ type: "error", message: traducirError(error.message) });
+    else
+      setFeedback({
+        type: "success",
+        message: "Te enviamos un correo para restablecer tu contraseña.",
+      });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -168,6 +187,18 @@ const Login = () => {
                 </button>
               </div>
             </div>
+
+            {activeTab === "login" && (
+              <div className="-mt-1 text-right">
+                <button
+                  type="button"
+                  onClick={handleForgot}
+                  className="text-caption text-muted hover:text-accent transition-colors duration-base"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
+            )}
 
             {feedback && (
               <div

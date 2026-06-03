@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, ChevronRight, ChevronLeft } from "lucide-react";
+import { Plus, ChevronRight, ChevronLeft } from "lucide-react";
 import { supabase } from "../../../lib/supabaseClient";
 import { Sidebar } from "../../../components/Sidebar";
 import { CardFlujo } from "../components/CardFlujo";
@@ -14,21 +14,28 @@ import { useRecentEntries } from "../hooks/useRecentEntries";
 import { useCreateMovement } from "../hooks/useCreateMovement";
 import { useAccountsList } from "../../accounts/hooks/useAccountsList";
 import { useMonthlyBudget, useExpenseSpent } from "../../budgets/hooks/useBudgets";
-import { getCurrentMonthRange } from "../../../lib/utils/dates";
+import { getMonthRange } from "../../../lib/utils/dates";
+import { useToast } from "../../../components/ToastProvider";
 
 const handleLogout = () => {
   supabase.auth.signOut();
 };
 
-const MES_ACTUAL = new Date().toLocaleDateString("es-CR", {
-  month: "long",
-  year: "numeric",
-});
-
 function Home() {
   const [openModal, setOpenModal] = useState(false);
   const navigate = useNavigate();
   const createMovement = useCreateMovement();
+  const toast = useToast();
+
+  const now = new Date();
+  const [cursor, setCursor] = useState({
+    year: now.getFullYear(),
+    month: now.getMonth(),
+  });
+  const { from, to } = useMemo(
+    () => getMonthRange(cursor.year, cursor.month),
+    [cursor],
+  );
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -36,12 +43,64 @@ function Home() {
     });
   }, [navigate]);
 
-  const { data: dashboardData } = useDashboardReport();
+  const { data: dashboardData } = useDashboardReport(from, to);
   const { data: recentEntries = [] } = useRecentEntries();
   const { data: accounts = [] } = useAccountsList();
   const { data: budget } = useMonthlyBudget();
-  const monthRange = getCurrentMonthRange();
-  const { data: spentMap = {} } = useExpenseSpent(monthRange.from, monthRange.to);
+  const { data: spentMap = {} } = useExpenseSpent(from, to);
+
+  // --- Multi-moneda: nunca sumamos monedas distintas ---
+  const byCurrency = useMemo(() => dashboardData?.by_currency ?? [], [dashboardData]);
+  const primaryCurrency = dashboardData?.primary_currency ?? "CRC";
+  const [selectedCurrency, setSelectedCurrency] = useState(null);
+  const activeCurrency = selectedCurrency ?? primaryCurrency;
+
+  const cdata = useMemo(() => {
+    const found = byCurrency.find((c) => c.currency_code === activeCurrency);
+    return (
+      found ?? {
+        expense_total: 0,
+        income_total: 0,
+        asset_balance: 0,
+        liability_balance: 0,
+      }
+    );
+  }, [byCurrency, activeCurrency]);
+
+  const expenseByCat = useMemo(
+    () =>
+      (dashboardData?.expense_by_category ?? []).filter(
+        (c) => c.currency_code === activeCurrency,
+      ),
+    [dashboardData, activeCurrency],
+  );
+
+  // Mes anterior (para la comparación %).
+  const prevRange = useMemo(() => {
+    const d = new Date(cursor.year, cursor.month - 1, 1);
+    return getMonthRange(d.getFullYear(), d.getMonth());
+  }, [cursor]);
+  const { data: prevDashboard } = useDashboardReport(prevRange.from, prevRange.to);
+  const pdata = useMemo(() => {
+    const list = prevDashboard?.by_currency ?? [];
+    return list.find((c) => c.currency_code === activeCurrency) ?? null;
+  }, [prevDashboard, activeCurrency]);
+
+  const pctChange = (curr, prev) => {
+    const c = Number(curr) || 0;
+    const p = Number(prev) || 0;
+    if (p === 0) return 0; // sin base de comparación → la tarjeta muestra "—"
+    return ((c - p) / p) * 100;
+  };
+  const expensePct = pctChange(cdata.expense_total, pdata?.expense_total);
+  const incomePct = pctChange(cdata.income_total, pdata?.income_total);
+
+  function shiftMonth(delta) {
+    setCursor((c) => {
+      const d = new Date(c.year, c.month + delta, 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
+  }
 
   const presupuestos = useMemo(() => {
     if (!budget?.budget_line?.length) return [];
@@ -67,21 +126,27 @@ function Home() {
         debit_account_id: movement.cuentaDestinoId,
         credit_account_id: movement.cuentaOrigenId,
         memo: movement.nombre,
+        tags: movement.tags,
       });
       setOpenModal(false);
+      toast.success("Movimiento guardado");
     } catch (e) {
-      alert("Error al guardar el movimiento: " + (e.message || String(e)));
+      toast.error("Error al guardar el movimiento: " + (e.message || String(e)));
     }
   }
 
-  const mesCapitalizado = MES_ACTUAL.charAt(0).toUpperCase() + MES_ACTUAL.slice(1);
+  const mesLabel = new Date(cursor.year, cursor.month, 1).toLocaleDateString(
+    "es-CR",
+    { month: "long", year: "numeric" },
+  );
+  const mesCapitalizado = mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1);
 
   return (
     <div className="min-h-screen w-full text-primary">
       <Sidebar handleLogout={handleLogout} />
 
       <div className="ml-[64px] flex flex-col min-h-screen">
-        <header className="relative h-16 glass-panel border-b border-default flex items-center justify-between px-6 sticky top-0 z-30">
+        <header className="relative min-h-16 glass-panel border-b border-default flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-2.5 sm:py-0 sm:h-16 sticky top-0 z-30">
           {/* Bottom accent line on header */}
           <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent pointer-events-none" />
 
@@ -96,9 +161,29 @@ function Home() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            {byCurrency.length > 1 && (
+              <div className="flex items-center bg-surface border border-default rounded-md p-0.5">
+                {byCurrency.map((c) => (
+                  <button
+                    key={c.currency_code}
+                    type="button"
+                    onClick={() => setSelectedCurrency(c.currency_code)}
+                    className={`px-2.5 h-7 rounded-md text-[12px] font-semibold transition-colors duration-base ${
+                      activeCurrency === c.currency_code
+                        ? "bg-elevated text-primary"
+                        : "text-muted hover:text-primary"
+                    }`}
+                  >
+                    {c.currency_code}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center bg-surface border border-default rounded-md p-0.5">
               <button
                 type="button"
+                onClick={() => shiftMonth(-1)}
                 className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:bg-elevated hover:text-primary transition-colors duration-base"
                 aria-label="Mes anterior"
               >
@@ -109,20 +194,12 @@ function Home() {
               </span>
               <button
                 type="button"
+                onClick={() => shiftMonth(1)}
                 className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:bg-elevated hover:text-primary transition-colors duration-base"
                 aria-label="Mes siguiente"
               >
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
-            </div>
-
-            <div className="hidden md:flex items-center gap-2 bg-surface border border-default rounded-md px-3 py-1.5 w-44 focus-within:border-accent focus-within:shadow-focus transition-all duration-base">
-              <Search className="w-3.5 h-3.5 text-faint" />
-              <input
-                type="text"
-                placeholder="Buscar…"
-                className="bg-transparent border-0 outline-none flex-1 text-[12px] text-primary placeholder:text-faint"
-              />
             </div>
 
             <button
@@ -139,33 +216,37 @@ function Home() {
           </div>
         </header>
 
-        <main className="flex-1 p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <CardFlujo
               trending="down"
               nombre="Gasto del mes"
-              saldo={dashboardData?.expense_total ?? 0}
-              porcentaje={0}
+              saldo={cdata.expense_total}
+              currency={activeCurrency}
+              porcentaje={expensePct}
               descripcion="vs mes pasado"
             />
             <CardFlujo
               trending="up"
               nombre="Ingreso del mes"
-              saldo={dashboardData?.income_total ?? 0}
-              porcentaje={0}
+              saldo={cdata.income_total}
+              currency={activeCurrency}
+              porcentaje={incomePct}
               descripcion="vs mes pasado"
             />
             <CardBalance
               nombre="Balance disponible"
-              saldo={dashboardData?.asset_balance ?? 0}
+              saldo={cdata.asset_balance}
+              currency={activeCurrency}
               tipo="ASSET"
               detalles="Disponible para gastar"
             />
             <CardBalance
               nombre="Deuda de tarjeta"
-              saldo={dashboardData?.liability_balance ?? 0}
+              saldo={cdata.liability_balance}
+              currency={activeCurrency}
               tipo="LIABILITY"
-              detalles="Próximo pago 15 de abril"
+              detalles="Saldo pendiente"
             />
           </div>
 
@@ -176,7 +257,8 @@ function Home() {
 
             <div className="lg:col-span-4">
               <CardGastosCategoria
-                categorias={dashboardData?.expense_by_category ?? []}
+                categorias={expenseByCat}
+                currency={activeCurrency}
               />
             </div>
 

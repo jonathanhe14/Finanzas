@@ -52,10 +52,13 @@ export async function getExpenseSpent(fromDate, toDate) {
  * Crea (upsert) la línea de presupuesto de una categoría con su límite.
  */
 export async function upsertBudgetLine({ budget_id, account_id, limit_amount }) {
+  const { data: userData } = await supabase.auth.getUser();
+  const user_id = userData?.user?.id ?? null;
+
   const { data, error } = await supabase
     .from("budget_lines")
     .upsert(
-      { budget_id, account_id, limit_amount: Number(limit_amount) || 0 },
+      { budget_id, account_id, limit_amount: Number(limit_amount) || 0, user_id },
       { onConflict: "budget_id,account_id" },
     )
     .select()
@@ -69,12 +72,16 @@ export async function upsertBudgetLine({ budget_id, account_id, limit_amount }) 
  * Crea el presupuesto recurrente mensual del usuario si aún no existe.
  */
 export async function createMonthlyBudget() {
+  const { data: userData } = await supabase.auth.getUser();
+  const user_id = userData?.user?.id ?? null;
+
   const payload = {
     name: "Presupuesto mensual",
     period: "monthly",
     start_date: new Date().toISOString().slice(0, 10),
     end_date: null,
     rollover: false,
+    user_id,
   };
 
   const { data, error } = await supabase
