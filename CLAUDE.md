@@ -24,7 +24,7 @@ VITE_SUPABASE_ANON_KEY=<anon-key>
 
 ## Architecture
 
-**React 19 + Vite SPA** backed by **Supabase** (PostgreSQL + Auth + Edge Functions). Deployed on Vercel with a SPA rewrite rule.
+**React 19 + Vite SPA** backed by **Supabase** (PostgreSQL + Auth). Deployed on Vercel with a SPA rewrite rule.
 
 ### Routing & Auth (`src/App.jsx`)
 
@@ -41,7 +41,7 @@ The Supabase client is a singleton at `src/lib/supabaseClient.js`.
 
 ### Database Model (double-entry accounting)
 
-The backend uses a double-entry ledger. Every financial event is a `journal_entry` with two or more `postings` (debit + credit). The frontend never writes to these tables directly — it always calls the RPC `create_journal_entry_with_postings` (from the app) or `create_journal_entry_service` (from the Edge Function).
+The backend uses a double-entry ledger. Every financial event is a `journal_entry` with two or more `postings` (debit + credit). The frontend never writes to these tables directly — it always goes through the atomic RPCs: `create_journal_entry_with_postings` (create), `update_journal_entry` (edit) and `delete_journal_entry` (delete), all wrapped by `src/lib/services/movements.service.js`.
 
 Key read surfaces:
 - `v_postings_enriched` — postings joined with account/entry/merchant data
@@ -57,10 +57,6 @@ Key read surfaces:
 - **`useAccunts`** — (note typo in filename) provides `addJournalEntry` for saving new movements; also queries `v_postings_enriched` and the `accounts` table
 
 `ModalNuevoMovimiento` collects movement data; `Home.asyncHandleSave` maps the form payload to the double-entry RPC call via `useAccunts().addJournalEntry`.
-
-### Edge Function (`supabase/functions/add-movement/`)
-
-A Deno Edge Function for adding movements from external sources (e.g., mobile shortcuts). Authenticated via a shared `x-secret-key` header. Uses `service_role` to bypass RLS and calls `create_journal_entry_service` with an explicit `p_user_id`. Required env vars on the Supabase side: `SHORTCUT_SECRET_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_USER_ID`.
 
 ### Styling
 

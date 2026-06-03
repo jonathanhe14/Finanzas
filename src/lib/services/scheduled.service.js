@@ -42,7 +42,8 @@ function buildPostings(scheduled_id, { expense_account_id, payment_account_id, i
 
 /**
  * Crea un gasto fijo: el scheduled_entry + sus 2 scheduled_postings.
- * Rollback manual del entry si fallan los postings (mismo patrón que createMovement).
+ * Estas son tablas de PLANTILLA (no el ledger), por eso no pasan por el RPC de
+ * asientos; el rollback manual cubre el caso de que fallen los postings.
  */
 export async function createScheduledEntry({
   name,
@@ -188,41 +189,31 @@ export async function postScheduledEntry(scheduled_id, { entry_date } = {}) {
   const lines = await getScheduledPostings(scheduled_id);
   if (!lines.length) throw new Error("El gasto fijo no tiene líneas configuradas");
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user_id = userData?.user?.id ?? null;
-
   const date = entry_date || new Date().toISOString().slice(0, 10);
 
-  const { data: entry, error: entryErr } = await supabase
-    .from("journal_entries")
-    .insert({
-      entry_date: date,
-      description: sched.name,
-      merchant_id: sched.merchant_id ?? null,
-      status: "CLEARED",
-      currency_code: sched.currency_code,
-      user_id,
-    })
-    .select("id")
-    .single();
-
-  if (entryErr) throw entryErr;
-
-  const { error: postErr } = await supabase.from("postings").insert(
-    lines.map((l) => ({
-      entry_id: entry.id,
-      account_id: l.account_id,
+  // Genera el asiento real reutilizando el MISMO RPC atómico que el resto de
+  // movimientos: valida cuentas/moneda, exige que balancee e inserta cabecera
+  // y postings en una sola transacción del lado de Postgres.
+  const payload = {
+    entry_date: date,
+    description: sched.name,
+    merchant_id: sched.merchant_id ?? null,
+    status: "CLEARED",
+    currency_code: sched.currency_code,
+    postings: lines.map((l) => ({
+      account_id: String(l.account_id),
       debit: Number(l.debit) || 0,
       credit: Number(l.credit) || 0,
       memo: l.memo ?? null,
-      user_id,
     })),
+  };
+
+  const { data: entryId, error: entryErr } = await supabase.rpc(
+    "create_journal_entry_with_postings",
+    { payload },
   );
 
-  if (postErr) {
-    await supabase.from("journal_entries").delete().eq("id", entry.id);
-    throw postErr;
-  }
+  if (entryErr) throw entryErr;
 
   const completed = (Number(sched.completed_installments) || 0) + 1;
   const done = sched.total_installments != null && completed >= Number(sched.total_installments);
@@ -238,5 +229,5 @@ export async function postScheduledEntry(scheduled_id, { entry_date } = {}) {
 
   if (bumpErr) throw bumpErr;
 
-  return entry.id;
+  return entryId;
 }

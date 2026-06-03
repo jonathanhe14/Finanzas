@@ -18,10 +18,26 @@ export async function listMovements(limit = 200) {
 }
 
 /**
- * Crea un journal_entry con dos postings balanceados (double-entry).
+ * Construye los 2 postings balanceados (double-entry) de un movimiento.
  * Por convención:
- *  - debitAccountId: cuenta que recibe (suma para ASSET/EXPENSE)
- *  - creditAccountId: cuenta que entrega (suma para LIABILITY/INCOME)
+ *  - debit_account_id: cuenta que recibe (suma para ASSET/EXPENSE)
+ *  - credit_account_id: cuenta que entrega (suma para LIABILITY/INCOME)
+ * Los account_id se mandan como string porque los RPC los castean a bigint.
+ */
+function buildPostings({ debit_account_id, credit_account_id, amount, memo = null }) {
+  const amt = Number(amount);
+  return [
+    { account_id: String(debit_account_id), debit: amt, credit: 0, memo },
+    { account_id: String(credit_account_id), debit: 0, credit: amt, memo },
+  ];
+}
+
+/**
+ * Crea un journal_entry con dos postings balanceados (double-entry).
+ * Única vía: el RPC atómico `create_journal_entry_with_postings`, que valida
+ * que las cuentas sean del usuario, que la moneda coincida y que el asiento
+ * balancee — todo dentro de una transacción del lado de Postgres.
+ * Las etiquetas se aplican aparte: este RPC no las maneja.
  */
 export async function createMovement({
   entry_date,
@@ -42,52 +58,25 @@ export async function createMovement({
     throw new Error("El monto debe ser mayor a 0");
   }
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user_id = userData?.user?.id ?? null;
+  const payload = {
+    entry_date,
+    description,
+    merchant_id,
+    status,
+    currency_code,
+    postings: buildPostings({ debit_account_id, credit_account_id, amount, memo }),
+  };
 
-  const { data: entry, error: entryErr } = await supabase
-    .from("journal_entries")
-    .insert({
-      entry_date,
-      description,
-      merchant_id,
-      status,
-      currency_code,
-      user_id,
-    })
-    .select("id")
-    .single();
+  const { data: entryId, error } = await supabase.rpc(
+    "create_journal_entry_with_postings",
+    { payload },
+  );
 
-  if (entryErr) throw entryErr;
+  if (error) throw error;
 
-  const amt = Number(amount);
-  const { error: postErr } = await supabase.from("postings").insert([
-    {
-      entry_id: entry.id,
-      account_id: debit_account_id,
-      debit: amt,
-      credit: 0,
-      memo,
-      user_id,
-    },
-    {
-      entry_id: entry.id,
-      account_id: credit_account_id,
-      debit: 0,
-      credit: amt,
-      memo,
-      user_id,
-    },
-  ]);
+  if (Array.isArray(tags)) await setEntryTags(entryId, tags);
 
-  if (postErr) {
-    await supabase.from("journal_entries").delete().eq("id", entry.id);
-    throw postErr;
-  }
-
-  if (Array.isArray(tags)) await setEntryTags(entry.id, tags);
-
-  return entry.id;
+  return entryId;
 }
 
 /**
@@ -127,7 +116,11 @@ export async function getMovementDetail(entryId) {
 }
 
 /**
- * Actualiza un movimiento: la cabecera y reescribe sus 2 postings (delete + insert).
+ * Actualiza un movimiento de forma atómica vía el RPC `update_journal_entry`,
+ * que reescribe cabecera, postings y etiquetas en una sola transacción y
+ * verifica que el asiento pertenezca al usuario.
+ * `merchant_id` y `status` se reciben para no sobrescribir con null los valores
+ * existentes (el RPC hace UPDATE de esas columnas).
  */
 export async function updateMovement({
   id,
@@ -138,6 +131,9 @@ export async function updateMovement({
   debit_account_id,
   credit_account_id,
   memo = null,
+  merchant_id = null,
+  status = "CLEARED",
+  fx_rate = null,
   tags,
 }) {
   if (!id) throw new Error("Falta el id del movimiento");
@@ -148,39 +144,28 @@ export async function updateMovement({
     throw new Error("El monto debe ser mayor a 0");
   }
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user_id = userData?.user?.id ?? null;
+  const { error } = await supabase.rpc("update_journal_entry", {
+    p_entry_id: id,
+    p_entry_date: entry_date,
+    p_description: description,
+    p_merchant_id: merchant_id,
+    p_status: status,
+    p_currency_code: currency_code,
+    p_fx_rate: fx_rate,
+    p_postings: buildPostings({ debit_account_id, credit_account_id, amount, memo }),
+    p_tag_ids: Array.isArray(tags) ? tags.map(Number).filter(Boolean) : [],
+  });
 
-  const { error: updErr } = await supabase
-    .from("journal_entries")
-    .update({ entry_date, description, currency_code })
-    .eq("id", id);
-
-  if (updErr) throw updErr;
-
-  const { error: delErr } = await supabase.from("postings").delete().eq("entry_id", id);
-  if (delErr) throw delErr;
-
-  const amt = Number(amount);
-  const { error: insErr } = await supabase.from("postings").insert([
-    { entry_id: id, account_id: debit_account_id, debit: amt, credit: 0, memo, user_id },
-    { entry_id: id, account_id: credit_account_id, debit: 0, credit: amt, memo, user_id },
-  ]);
-
-  if (insErr) throw insErr;
-
-  if (Array.isArray(tags)) await setEntryTags(id, tags);
+  if (error) throw error;
 
   return id;
 }
 
 /**
- * Elimina un movimiento: primero sus postings, luego la cabecera.
+ * Elimina un movimiento de forma atómica vía el RPC `delete_journal_entry`,
+ * que borra etiquetas, postings y cabecera y verifica la propiedad del asiento.
  */
 export async function deleteMovement(id) {
-  const { error: postErr } = await supabase.from("postings").delete().eq("entry_id", id);
-  if (postErr) throw postErr;
-
-  const { error } = await supabase.from("journal_entries").delete().eq("id", id);
+  const { error } = await supabase.rpc("delete_journal_entry", { p_entry_id: id });
   if (error) throw error;
 }

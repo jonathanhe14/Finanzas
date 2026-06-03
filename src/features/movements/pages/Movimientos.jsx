@@ -212,6 +212,7 @@ export default function Movimientos() {
           debit_account_id: movement.cuentaDestinoId,
           credit_account_id: movement.cuentaOrigenId,
           memo: movement.nombre,
+          merchant_id: editing.merchant_id ?? null,
           tags: movement.tags,
         });
       } else {
@@ -240,6 +241,7 @@ export default function Movimientos() {
         id: detail.id,
         entry_date: detail.entry_date,
         currency_code: detail.currency_code,
+        merchant_id: detail.merchant_id ?? null,
         // forma que entiende el modal:
         nombre: detail.description ?? mov.merchant_name ?? "",
         monto: detail.amount,
