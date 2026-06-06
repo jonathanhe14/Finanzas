@@ -3,7 +3,7 @@ import {
   listAccounts,
   listCurrencies,
   createAccount,
-  archiveAccount,
+  deleteOrArchiveAccount,
   getAccountBalances,
 } from "../../../lib/services/accounts.service";
 import { QUERY_KEYS } from "../../../lib/constants/queryKeys";
@@ -42,12 +42,13 @@ export function useCreateAccount() {
   });
 }
 
-export function useArchiveAccount() {
+export function useDeleteOrArchiveAccount() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: archiveAccount,
+    mutationFn: deleteOrArchiveAccount,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [QUERY_KEYS.ACCOUNTS] });
+      qc.invalidateQueries({ queryKey: [QUERY_KEYS.ACCOUNT_BALANCES] });
     },
   });
 }

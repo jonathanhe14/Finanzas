@@ -3,11 +3,12 @@ import { Plus, CalendarClock } from "lucide-react";
 import { formatMoney } from "../../../lib/utils/money";
 import {
   useScheduledEntries,
-  usePostScheduledEntry,
+  usePayScheduledEntry,
   useSetScheduledActive,
 } from "../hooks/useScheduled";
 import { FixedExpenseCard } from "./FixedExpenseCard";
 import ModalGastoFijo from "./ModalGastoFijo";
+import ModalPagarFijo from "./ModalPagarFijo";
 import { useToast } from "../../../components/ToastProvider";
 
 function StatTile({ label, value, tone }) {
@@ -22,13 +23,14 @@ function StatTile({ label, value, tone }) {
 
 export function FixedExpensesTab() {
   const { data: entries = [], isLoading, isError, error } = useScheduledEntries();
-  const payMutation = usePostScheduledEntry();
+  const payMutation = usePayScheduledEntry();
   const setActive = useSetScheduledActive();
   const toast = useToast();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [payingId, setPayingId] = useState(null);
+  const [payingEntry, setPayingEntry] = useState(null);
 
   const totals = useMemo(() => {
     let mensual = 0;
@@ -56,16 +58,35 @@ export function FixedExpensesTab() {
     setModalOpen(true);
   }
 
+  // Abre el selector de cuenta de pago: la cuenta SIEMPRE la elige el usuario.
   function handlePay(entry) {
-    if (!window.confirm(`¿Registrar el pago de "${entry.name}" por ${formatMoney(entry.installment_amount, entry.currency_code)}?`)) {
-      return;
-    }
+    setPayingEntry(entry);
+  }
+
+  function handleConfirmPay(fromAccountId) {
+    const entry = payingEntry;
+    if (!entry) return;
     setPayingId(entry.id);
     payMutation.mutate(
-      { id: entry.id },
+      { id: entry.id, fromAccountId },
       {
-        onSuccess: () => toast.success("Pago registrado"),
-        onError: (e) => toast.error("Error al registrar el pago: " + (e?.message || String(e))),
+        onSuccess: (data) => {
+          setPayingEntry(null);
+          toast.success(
+            data?.is_active === false
+              ? `Pago registrado — "${entry.name}" completó sus cuotas`
+              : "Pago registrado",
+          );
+        },
+        onError: (e) => {
+          // 23505 = idempotencia: esa cuota ya se había pagado (no es fatal).
+          if (e?.code === "23505") {
+            setPayingEntry(null);
+            toast.error("Esa cuota ya estaba registrada");
+          } else {
+            toast.error("Error al registrar el pago: " + (e?.message || String(e)));
+          }
+        },
         onSettled: () => setPayingId(null),
       },
     );
@@ -158,6 +179,14 @@ export function FixedExpensesTab() {
       )}
 
       <ModalGastoFijo isOpen={modalOpen} onClose={() => setModalOpen(false)} entry={editing} />
+
+      <ModalPagarFijo
+        isOpen={!!payingEntry}
+        entry={payingEntry}
+        onClose={() => setPayingEntry(null)}
+        onConfirm={handleConfirmPay}
+        saving={payMutation.isPending}
+      />
     </div>
   );
 }

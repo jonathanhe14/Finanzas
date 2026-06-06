@@ -12,10 +12,12 @@ import { supabase } from "../../../lib/supabaseClient";
 import { formatMoney } from "../../../lib/utils/money";
 import {
   useAccountsList,
-  useArchiveAccount,
+  useAccountBalances,
+  useDeleteOrArchiveAccount,
   useCurrencies,
 } from "../hooks/useAccountsList";
 import ModalNuevaCuenta from "../components/ModalNuevaCuenta";
+import { useToast } from "../../../components/ToastProvider";
 
 const TYPE_META = {
   ASSET: {
@@ -52,10 +54,13 @@ const handleLogout = () => {
   supabase.auth.signOut();
 };
 
-function AccountRow({ account, onArchive }) {
+function AccountRow({ account, balance, onRemove }) {
   const meta = TYPE_META[account.type] ?? TYPE_META.ASSET;
   const Icon = meta.Icon;
   const showBalance = account.type === "ASSET" || account.type === "LIABILITY";
+  // Saldo actual (saldo inicial + movimientos, con el signo normal por tipo).
+  // Si aún no cargan los saldos, caemos al saldo inicial para no mostrar 0.
+  const saldo = balance ?? account.opening_balance ?? 0;
 
   return (
     <div className="group flex items-center gap-4 px-5 py-4 bg-surface border border-default rounded-2xl hover:bg-elevated hover:shadow-card-hover transition-all duration-base ease-standard">
@@ -80,20 +85,20 @@ function AccountRow({ account, onArchive }) {
       {showBalance && (
         <div className="text-right">
           <div className="amount text-num-md text-primary">
-            {formatMoney(account.opening_balance ?? 0, account.currency_code)}
+            {formatMoney(saldo, account.currency_code)}
           </div>
           <div className="text-[10px] text-muted uppercase tracking-wider mt-0.5">
-            Saldo inicial
+            Saldo actual
           </div>
         </div>
       )}
 
       <button
         type="button"
-        onClick={() => onArchive(account.id)}
+        onClick={() => onRemove(account.id)}
         className="md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-base w-9 h-9 rounded-lg hover:bg-danger/10 flex items-center justify-center text-muted hover:text-danger"
-        title="Archivar"
-        aria-label="Archivar cuenta"
+        title="Eliminar"
+        aria-label="Eliminar cuenta"
       >
         <Archive className="w-4 h-4" />
       </button>
@@ -101,7 +106,7 @@ function AccountRow({ account, onArchive }) {
   );
 }
 
-function Section({ title, description, items, onArchive, emptyHint }) {
+function Section({ title, description, items, balances = {}, onRemove, emptyHint }) {
   if (items.length === 0) {
     return (
       <div className="bg-elevated border border-dashed border-default rounded-2xl px-6 py-10 text-center">
@@ -122,7 +127,12 @@ function Section({ title, description, items, onArchive, emptyHint }) {
       </div>
       <div className="space-y-2">
         {items.map((acc) => (
-          <AccountRow key={acc.id} account={acc} onArchive={onArchive} />
+          <AccountRow
+            key={acc.id}
+            account={acc}
+            balance={balances[acc.id]}
+            onRemove={onRemove}
+          />
         ))}
       </div>
     </div>
@@ -134,8 +144,10 @@ export default function Cuentas() {
   const [openModal, setOpenModal] = useState(false);
 
   const { data: accounts = [], isLoading, isError, error } = useAccountsList();
+  const { data: balances = {} } = useAccountBalances();
   useCurrencies();
-  const archiveMutation = useArchiveAccount();
+  const removeMutation = useDeleteOrArchiveAccount();
+  const toast = useToast();
 
   const grouped = useMemo(() => {
     const g = { ASSET: [], LIABILITY: [], EXPENSE: [], INCOME: [] };
@@ -145,9 +157,22 @@ export default function Cuentas() {
     return g;
   }, [accounts]);
 
-  function handleArchive(id) {
-    if (!confirm("¿Archivar esta cuenta? Ya no aparecerá en los listados.")) return;
-    archiveMutation.mutate(id);
+  function handleRemove(id) {
+    if (
+      !confirm(
+        "¿Eliminar esta cuenta? Si no tiene movimientos se borrará de forma permanente; si tiene historial, se archivará.",
+      )
+    )
+      return;
+    removeMutation.mutate(id, {
+      onSuccess: (result) =>
+        toast.success(
+          result === "deleted"
+            ? "Cuenta eliminada"
+            : "La cuenta tiene historial: se archivó en lugar de eliminarse",
+        ),
+      onError: (e) => toast.error("Error al eliminar: " + (e?.message || String(e))),
+    });
   }
 
   const isCuentas = tab === "cuenta";
@@ -219,14 +244,16 @@ export default function Cuentas() {
                 title="Activos"
                 description="Efectivo, cuentas bancarias, ahorros"
                 items={grouped.ASSET}
-                onArchive={handleArchive}
+                balances={balances}
+                onRemove={handleRemove}
                 emptyHint="Aún no tienes cuentas de activo. Crea una para empezar."
               />
               <Section
                 title="Pasivos"
                 description="Tarjetas de crédito, préstamos"
                 items={grouped.LIABILITY}
-                onArchive={handleArchive}
+                balances={balances}
+                onRemove={handleRemove}
                 emptyHint="Sin pasivos registrados."
               />
             </div>
@@ -238,14 +265,14 @@ export default function Cuentas() {
                 title="Categorías de gasto"
                 description="A dónde va tu dinero"
                 items={grouped.EXPENSE}
-                onArchive={handleArchive}
+                onRemove={handleRemove}
                 emptyHint="Aún no tienes categorías de gasto."
               />
               <Section
                 title="Categorías de ingreso"
                 description="De dónde viene tu dinero"
                 items={grouped.INCOME}
-                onArchive={handleArchive}
+                onRemove={handleRemove}
                 emptyHint="Aún no tienes categorías de ingreso."
               />
             </div>

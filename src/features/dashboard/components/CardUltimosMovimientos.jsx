@@ -1,4 +1,4 @@
-import { TrendingDown, TrendingUp, ArrowLeftRight, Receipt } from "lucide-react";
+import { TrendingDown, TrendingUp, ArrowLeftRight, ArrowRight, Receipt } from "lucide-react";
 import { formatMoney } from "../../../lib/utils/money";
 
 const TIPO_CONFIG = {
@@ -67,9 +67,19 @@ export function CardUltimosMovimientos({ movimientos = [] }) {
 
                 <div className="flex-1 min-w-0">
                   <div className="text-body font-medium truncate text-primary">
-                    {mov.merchant_name ?? mov.description}
+                    {mov.merchant_name ?? mov.description ?? "Movimiento"}
                   </div>
-                  <div className="text-caption text-muted mt-0.5">{mov.entry_date}</div>
+                  {mov.origen_name && mov.destino_name && (
+                    <div className="flex items-center gap-1 text-caption text-muted mt-0.5 min-w-0">
+                      <span className="truncate">{mov.origen_name}</span>
+                      <ArrowRight
+                        className="w-3 h-3 flex-shrink-0 opacity-50"
+                        strokeWidth={2.25}
+                      />
+                      <span className="truncate">{mov.destino_name}</span>
+                    </div>
+                  )}
+                  <div className="text-caption text-faint mt-0.5">{mov.entry_date}</div>
                 </div>
 
                 <div className="flex flex-col items-end gap-1">

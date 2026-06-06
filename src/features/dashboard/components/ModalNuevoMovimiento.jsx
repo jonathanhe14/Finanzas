@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { X, TrendingDown, TrendingUp, ArrowRight } from "lucide-react";
-import { useAccountsList } from "../../accounts/hooks/useAccountsList";
+import { X, TrendingDown, TrendingUp, ArrowRight, Sparkles } from "lucide-react";
+import { useAccountsList, useAccountBalances } from "../../accounts/hooks/useAccountsList";
 import { useModalTransition } from "../../../lib/hooks/useModalTransition";
 import { useTags, useCreateTag } from "../../movements/hooks/useTags";
+import { formatMoney } from "../../../lib/utils/money";
 
 const TYPE_META = {
   gasto: {
@@ -29,6 +30,14 @@ const TYPE_META = {
     border: "border-info/30",
     btn: "bg-info hover:shadow-[0_0_24px_-4px_rgba(56,189,248,0.5)]",
   },
+  reconocer: {
+    label: "Reconocer ganancia",
+    Icon: Sparkles,
+    color: "text-accent",
+    bg: "bg-accent/10",
+    border: "border-accent/30",
+    btn: "bg-accent hover:shadow-[0_0_24px_-4px_rgba(6,182,212,0.5)]",
+  },
 };
 
 function FieldLabel({ children }) {
@@ -37,7 +46,7 @@ function FieldLabel({ children }) {
   );
 }
 
-function SelectField({ value, onChange, placeholder, options, disabled }) {
+function SelectField({ value, onChange, placeholder, options = [], groups, disabled }) {
   return (
     <select
       value={value}
@@ -55,11 +64,21 @@ function SelectField({ value, onChange, placeholder, options, disabled }) {
           {placeholder}
         </option>
       )}
-      {options.map((o) => (
-        <option key={o.value} value={o.value} className="bg-surface">
-          {o.label}
-        </option>
-      ))}
+      {groups
+        ? groups.map((g) => (
+            <optgroup key={g.label} label={g.label} className="bg-surface">
+              {g.options.map((o) => (
+                <option key={o.value} value={o.value} className="bg-surface">
+                  {o.label}
+                </option>
+              ))}
+            </optgroup>
+          ))
+        : options.map((o) => (
+            <option key={o.value} value={o.value} className="bg-surface">
+              {o.label}
+            </option>
+          ))}
     </select>
   );
 }
@@ -87,15 +106,17 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
   const visible = useModalTransition(isOpen);
 
   const { data: accounts = [], isLoading: loadingAccounts } = useAccountsList();
+  const { data: balances = {} } = useAccountBalances();
   const { data: allTags = [] } = useTags();
   const createTag = useCreateTag();
   const [newTag, setNewTag] = useState("");
 
-  const { paymentAccounts, expenseCategories, incomeCategories } = useMemo(() => {
+  const { paymentAccounts, expenseCategories, incomeCategories, liabilityAccounts } = useMemo(() => {
     return {
       paymentAccounts: accounts.filter((a) => a.type === "ASSET" || a.type === "LIABILITY"),
       expenseCategories: accounts.filter((a) => a.type === "EXPENSE"),
       incomeCategories: accounts.filter((a) => a.type === "INCOME"),
+      liabilityAccounts: accounts.filter((a) => a.type === "LIABILITY"),
     };
   }, [accounts]);
 
@@ -141,9 +162,29 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
 
   const meta = TYPE_META[form.tipo];
 
+  // "Reconocer ganancia": saldo actual de la deuda seleccionada y aviso si el
+  // monto lo excede (el RPC lo rechaza, así que esto es una advertencia previa).
+  const selectedLiability = liabilityAccounts.find(
+    (a) => String(a.id) === form.cuentaOrigenId,
+  );
+  const liabilityBalance = selectedLiability ? balances[selectedLiability.id] : undefined;
+  const reconocerExcedeSaldo =
+    form.tipo === "reconocer" &&
+    liabilityBalance != null &&
+    !Number.isNaN(parseFloat(form.monto)) &&
+    parseFloat(form.monto) > liabilityBalance;
+
+  // El nombre/descripción es obligatorio salvo en "reconocer ganancia",
+  // donde es opcional (el RPC pone una descripción por defecto).
+  const nombreRequired = form.tipo !== "reconocer";
+  const camposIncompletos =
+    (nombreRequired && !form.nombre.trim()) ||
+    !form.monto ||
+    !form.cuentaOrigenId ||
+    !form.cuentaDestinoId;
+
   function handleSave() {
-    if (!form.nombre.trim() || !form.monto) return;
-    if (!form.cuentaOrigenId || !form.cuentaDestinoId) return;
+    if (camposIncompletos) return;
     onSave({
       ...form,
       monto: parseFloat(form.monto),
@@ -153,6 +194,12 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
   }
 
   const accOptions = (list) => list.map((a) => ({ value: String(a.id), label: a.name }));
+
+  // Preselección por nombre (con fallback a la primera cuenta del tipo).
+  const pickDefaultId = (list, preferred) => {
+    const match = list.find((a) => a.name.toLowerCase().includes(preferred));
+    return String((match ?? list[0])?.id ?? "");
+  };
 
   const toggleTag = (id) =>
     setForm((f) => ({
@@ -212,8 +259,8 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
         <div className="px-6 py-5 space-y-5 overflow-y-auto thin-scroll max-h-[70vh]">
           <div>
             <FieldLabel>Tipo</FieldLabel>
-            <div className="grid grid-cols-3 gap-1.5 bg-sunken p-1 rounded-xl border border-default">
-              {["gasto", "ingreso", "transferencia"].map((t) => {
+            <div className="grid grid-cols-2 gap-1.5 bg-sunken p-1 rounded-xl border border-default">
+              {["gasto", "ingreso", "transferencia", "reconocer"].map((t) => {
                 const m = TYPE_META[t];
                 const Icon = m.Icon;
                 const active = form.tipo === t;
@@ -222,12 +269,25 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
                     key={t}
                     type="button"
                     onClick={() =>
-                      setForm((f) => ({
-                        ...defaultForm,
-                        nombre: f.nombre,
-                        monto: f.monto,
-                        tipo: t,
-                      }))
+                      setForm((f) => {
+                        const base = {
+                          ...defaultForm,
+                          nombre: f.nombre,
+                          monto: f.monto,
+                          tipo: t,
+                        };
+                        if (t === "reconocer") {
+                          base.cuentaOrigenId = pickDefaultId(
+                            liabilityAccounts,
+                            "fondos por depositar",
+                          );
+                          base.cuentaDestinoId = pickDefaultId(
+                            incomeCategories,
+                            "ganancias reparto",
+                          );
+                        }
+                        return base;
+                      })
                     }
                     className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg transition-all duration-base ease-standard ${
                       active
@@ -244,12 +304,18 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
           </div>
 
           <div>
-            <FieldLabel>Nombre</FieldLabel>
+            <FieldLabel>
+              {form.tipo === "reconocer" ? "Descripción (opcional)" : "Nombre"}
+            </FieldLabel>
             <input
               type="text"
               value={form.nombre}
               onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
-              placeholder="Ej. Supermercado, Salario…"
+              placeholder={
+                form.tipo === "reconocer"
+                  ? "Ej. Comisión reconocida…"
+                  : "Ej. Supermercado, Salario…"
+              }
               className="w-full bg-sunken border border-default rounded-md px-3.5 py-2.5 text-body font-medium text-primary placeholder:text-faint focus:outline-none focus:border-accent focus:shadow-focus transition-all duration-base"
             />
           </div>
@@ -301,7 +367,7 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
 
               <div>
                 <FieldLabel>Categoría</FieldLabel>
-                {expenseCategories.length === 0 ? (
+                {expenseCategories.length === 0 && liabilityAccounts.length === 0 ? (
                   <EmptyHint>
                     Sin categorías de gasto. Crea una en Cuentas → Categorías.
                   </EmptyHint>
@@ -312,7 +378,20 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
                       setForm((f) => ({ ...f, cuentaDestinoId: e.target.value }))
                     }
                     placeholder="Selecciona una categoría"
-                    options={accOptions(expenseCategories)}
+                    groups={[
+                      {
+                        label: "Categorías de gasto",
+                        options: accOptions(expenseCategories),
+                      },
+                      {
+                        label: "Préstamos / Pasivos",
+                        options: accOptions(
+                          liabilityAccounts.filter(
+                            (a) => String(a.id) !== form.cuentaOrigenId,
+                          ),
+                        ),
+                      },
+                    ].filter((g) => g.options.length > 0)}
                   />
                 )}
               </div>
@@ -341,7 +420,7 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
 
               <div>
                 <FieldLabel>Categoría del ingreso</FieldLabel>
-                {incomeCategories.length === 0 ? (
+                {incomeCategories.length === 0 && liabilityAccounts.length === 0 ? (
                   <EmptyHint>
                     Sin categorías de ingreso. Crea una en Cuentas → Categorías.
                   </EmptyHint>
@@ -352,7 +431,20 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
                       setForm((f) => ({ ...f, cuentaOrigenId: e.target.value }))
                     }
                     placeholder="Selecciona una categoría"
-                    options={accOptions(incomeCategories)}
+                    groups={[
+                      {
+                        label: "Categorías de ingreso",
+                        options: accOptions(incomeCategories),
+                      },
+                      {
+                        label: "Préstamos / Pasivos",
+                        options: accOptions(
+                          liabilityAccounts.filter(
+                            (a) => String(a.id) !== form.cuentaDestinoId,
+                          ),
+                        ),
+                      },
+                    ].filter((g) => g.options.length > 0)}
                   />
                 )}
               </div>
@@ -408,6 +500,75 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
                   />
                 )}
               </div>
+            </div>
+          )}
+
+          {!loadingAccounts && form.tipo === "reconocer" && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="text-caption text-muted bg-accent/5 border border-accent/20 rounded-md px-3 py-2">
+                Reclasifica dinero marcado como ajeno (un pasivo) a ingreso propio.
+                No mueve dinero entre cuentas: ningún banco cambia.
+              </div>
+
+              <div>
+                <FieldLabel>Cuenta de origen (pasivo)</FieldLabel>
+                {liabilityAccounts.length === 0 ? (
+                  <EmptyHint>
+                    No tienes cuentas de pasivo. Crea una en la pestaña Cuentas.
+                  </EmptyHint>
+                ) : (
+                  <SelectField
+                    value={form.cuentaOrigenId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cuentaOrigenId: e.target.value }))
+                    }
+                    placeholder="Selecciona el pasivo"
+                    options={accOptions(liabilityAccounts)}
+                  />
+                )}
+                {selectedLiability && liabilityBalance != null && (
+                  <p className="text-caption text-muted mt-1.5">
+                    Saldo de la deuda:{" "}
+                    <span className="amount text-secondary">
+                      {formatMoney(liabilityBalance, selectedLiability.currency_code)}
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 py-0.5">
+                <div className="flex-1 h-px bg-white/10" />
+                <div className="w-7 h-7 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-3.5 h-3.5 text-accent" strokeWidth={2.5} />
+                </div>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
+
+              <div>
+                <FieldLabel>Cuenta de destino (ingreso)</FieldLabel>
+                {incomeCategories.length === 0 ? (
+                  <EmptyHint>
+                    Sin categorías de ingreso. Crea una en Cuentas → Categorías.
+                  </EmptyHint>
+                ) : (
+                  <SelectField
+                    value={form.cuentaDestinoId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cuentaDestinoId: e.target.value }))
+                    }
+                    placeholder="Selecciona el ingreso"
+                    options={accOptions(incomeCategories)}
+                  />
+                )}
+              </div>
+
+              {reconocerExcedeSaldo && (
+                <div className="text-caption text-warning bg-warning/10 border border-warning/30 rounded-md px-3 py-2">
+                  El monto supera el saldo de la deuda (
+                  {formatMoney(liabilityBalance, selectedLiability.currency_code)}). No
+                  puedes reconocer más ganancia de la que tenías marcada como ajena.
+                </div>
+              )}
             </div>
           )}
 
@@ -472,13 +633,7 @@ export default function ModalNuevoMovimiento({ isOpen, onClose, onSave, isSaving
           <button
             type="button"
             onClick={handleSave}
-            disabled={
-              !form.nombre.trim() ||
-              !form.monto ||
-              !form.cuentaOrigenId ||
-              !form.cuentaDestinoId ||
-              isSaving
-            }
+            disabled={camposIncompletos || isSaving}
             className={`flex-1 text-[13px] font-semibold text-white rounded-md py-2.5 transition-all duration-base ease-standard active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed ${meta.btn}`}
           >
             {isSaving ? "Guardando…" : isEdit ? "Guardar cambios" : meta.label}

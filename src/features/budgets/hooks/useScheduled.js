@@ -5,7 +5,7 @@ import {
   createScheduledEntry,
   updateScheduledEntry,
   setScheduledActive,
-  postScheduledEntry,
+  payScheduledEntry,
 } from "../../../lib/services/scheduled.service";
 import { QUERY_KEYS } from "../../../lib/constants/queryKeys";
 
@@ -55,16 +55,18 @@ export function useSetScheduledActive() {
   });
 }
 
-export function usePostScheduledEntry() {
+export function usePayScheduledEntry() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, entry_date } = {}) => postScheduledEntry(id, { entry_date }),
+    mutationFn: ({ id, fromAccountId, entry_date = null } = {}) =>
+      payScheduledEntry(id, fromAccountId, { entry_date }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [QUERY_KEYS.SCHEDULED] });
       qc.invalidateQueries({ queryKey: [QUERY_KEYS.DASHBOARD_REPORT] });
       qc.invalidateQueries({ queryKey: [QUERY_KEYS.RECENT_MOVEMENTS] });
       qc.invalidateQueries({ queryKey: [QUERY_KEYS.JOURNAL_ENTRIES] });
       qc.invalidateQueries({ queryKey: [QUERY_KEYS.ACCOUNTS] });
+      qc.invalidateQueries({ queryKey: [QUERY_KEYS.ACCOUNT_BALANCES] });
       qc.invalidateQueries({ queryKey: [QUERY_KEYS.BUDGET_PROGRESS] });
     },
   });

@@ -1,25 +1,12 @@
 import { Pencil, Pause, Check } from "lucide-react";
 import { formatMoney } from "../../../lib/utils/money";
-import { daysUntil } from "../../../lib/utils/dates";
+import { dueBadge, formatShortDate } from "../../../lib/utils/dates";
 
 const TYPE_LABEL = {
   SUBSCRIPTION: "Suscripción",
   LOAN: "Préstamo",
   INSTALLMENT: "Cuotas",
 };
-
-function dueBadge(dateStr) {
-  const d = daysUntil(dateStr);
-  if (d < 0) return { text: `Vencido hace ${Math.abs(d)}d`, cls: "bg-danger/10 text-danger border-danger/30" };
-  if (d === 0) return { text: "Hoy", cls: "bg-warning/10 text-warning border-warning/30" };
-  if (d <= 7) return { text: `En ${d} día${d === 1 ? "" : "s"}`, cls: "bg-warning/10 text-warning border-warning/30" };
-  return { text: `En ${d} días`, cls: "bg-elevated text-muted border-default" };
-}
-
-function formatDate(dateStr) {
-  const [y, m, d] = String(dateStr).slice(0, 10).split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("es-CR", { day: "numeric", month: "short" });
-}
 
 export function FixedExpenseCard({ entry, onPay, onEdit, onPause, paying, disabled }) {
   const currency = entry.currency_code ?? "CRC";
@@ -49,7 +36,7 @@ export function FixedExpenseCard({ entry, onPay, onEdit, onPause, paying, disabl
             <span className={`text-[10px] font-semibold border px-2 py-0.5 rounded-full ${badge.cls}`}>
               {badge.text}
             </span>
-            <span className="text-caption text-muted">{formatDate(entry.next_run_date)}</span>
+            <span className="text-caption text-muted">{formatShortDate(entry.next_run_date)}</span>
           </div>
         </div>
         <span className="amount text-num-md text-primary flex-shrink-0">{formatMoney(cuota, currency)}</span>

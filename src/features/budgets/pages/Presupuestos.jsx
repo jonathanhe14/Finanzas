@@ -1,5 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, PiggyBank } from "lucide-react";
 import { Sidebar } from "../../../components/Sidebar";
 import { supabase } from "../../../lib/supabaseClient";
@@ -21,16 +20,9 @@ const handleLogout = () => {
 };
 
 export default function Presupuestos() {
-  const navigate = useNavigate();
   const now = new Date();
   const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() });
   const [tab, setTab] = useState("categorias");
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data?.user) navigate("/login");
-    });
-  }, [navigate]);
 
   const { from, to } = useMemo(
     () => getMonthRange(cursor.year, cursor.month),

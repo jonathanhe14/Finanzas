@@ -60,11 +60,18 @@ export async function createAccount({ name, type, currency_code, opening_balance
   return data;
 }
 
-export async function archiveAccount(id) {
-  const { error } = await supabase
-    .from("accounts")
-    .update({ is_archived: true })
-    .eq("id", id);
+/**
+ * "Elimina" una cuenta vía el RPC `delete_or_archive_account`:
+ *  - si no tiene dependencias (movimientos, metas, programados, líneas de
+ *    presupuesto o subcuentas) la BORRA de la BD;
+ *  - si las tiene, la archiva (is_archived = true) para no romper el historial.
+ * Devuelve 'deleted' o 'archived'.
+ */
+export async function deleteOrArchiveAccount(id) {
+  const { data, error } = await supabase.rpc("delete_or_archive_account", {
+    p_account_id: id,
+  });
 
   if (error) throw error;
+  return data;
 }

@@ -18,6 +18,21 @@ export async function listMovements(limit = 200) {
 }
 
 /**
+ * Lista TODOS los movimientos en el rango [from, to) (sin límite), vía el RPC
+ * `report_movements`. Mismas columnas que `get_recent_entries` (incluye
+ * origen/destino). Pensado para exportar a CSV.
+ */
+export async function listMovementsByRange(from, to) {
+  const { data, error } = await supabase.rpc("report_movements", {
+    p_from: from,
+    p_to: to,
+  });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => ({ ...row, id: row.entry_id }));
+}
+
+/**
  * Construye los 2 postings balanceados (double-entry) de un movimiento.
  * Por convención:
  *  - debit_account_id: cuenta que recibe (suma para ASSET/EXPENSE)
@@ -77,6 +92,40 @@ export async function createMovement({
   if (Array.isArray(tags)) await setEntryTags(entryId, tags);
 
   return entryId;
+}
+
+/**
+ * "Reconocer ganancia": reclasifica un monto de un pasivo (dinero ajeno) a un
+ * ingreso propio, sin mover dinero entre cuentas (ningún ASSET cambia).
+ * Vía el RPC `reconocer_ganancia`, que genera los 2 postings con la convención
+ * INVERSA a un ingreso normal (débito al pasivo, crédito al ingreso), valida
+ * tipos/moneda y que el monto no exceda el saldo de la deuda.
+ * Devuelve { entry_id, monto, saldo_deuda_restante }.
+ */
+export async function reconocerGanancia({
+  amount,
+  liability_account_id,
+  income_account_id,
+  entry_date = null,
+  description = null,
+}) {
+  if (!liability_account_id || !income_account_id) {
+    throw new Error("Faltan la cuenta de origen (pasivo) o destino (ingreso)");
+  }
+  if (!amount || Number(amount) <= 0) {
+    throw new Error("El monto debe ser mayor a 0");
+  }
+
+  const { data, error } = await supabase.rpc("reconocer_ganancia", {
+    p_monto: Number(amount),
+    p_liability_account_id: Number(liability_account_id),
+    p_income_account_id: Number(income_account_id),
+    p_entry_date: entry_date ?? new Date().toISOString().slice(0, 10),
+    p_description: description?.trim() || "Reconocimiento de ganancia",
+  });
+
+  if (error) throw error;
+  return data;
 }
 
 /**

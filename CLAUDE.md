@@ -28,7 +28,12 @@ VITE_SUPABASE_ANON_KEY=<anon-key>
 
 ### Routing & Auth (`src/App.jsx`)
 
-`onAuthStateChange` drives all navigation: unauthenticated sessions redirect to `/login`, authenticated ones to `/home`. Routes are flat — `/presupuesto` and `/cuentas` both render `<Home>` (not yet split out into separate pages).
+Auth state is reactive and centralized in `AuthProvider` (`src/context/AuthContext.jsx`), mounted in `main.jsx`. It seeds from `supabase.auth.getSession()` and stays in sync via `onAuthStateChange`, exposing `{ session, user, loading }` through the `useAuth()` hook.
+
+Routing is declarative in `src/App.jsx`:
+- Private routes (`/home`, `/movimientos`, `/presupuesto`, `/cuentas`, `/reportes`, `/metas`) are wrapped in `<ProtectedRoute>` (`src/components/ProtectedRoute.jsx`), which blocks rendering until the session is known and redirects to `/login` (preserving the origin in `location.state.from`) when there is none.
+- `/login` redirects authenticated users to `/home`; `/reset` is always public (it relies on the temporary recovery session).
+- Logout is just `supabase.auth.signOut()` from any page — the auth listener clears the session and `<ProtectedRoute>` redirects to `/login`. No imperative navigation needed.
 
 ### Data Layer
 

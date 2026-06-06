@@ -1,5 +1,4 @@
 import { supabase } from "../supabaseClient";
-import { advanceByRRule } from "../utils/dates";
 
 /**
  * Lista los gastos fijos activos del usuario, ordenados por próxima fecha de pago.
@@ -30,13 +29,15 @@ export async function getScheduledPostings(scheduled_id) {
 }
 
 /**
- * Construye las 2 líneas (débito en la cuenta de gasto, crédito en la cuenta que paga).
+ * Plantilla del asiento: SOLO la pata destino (la cuenta de gasto, o el pasivo
+ * a reducir en un préstamo), con débito = monto de la cuota. La pata de la
+ * cuenta que paga NO se guarda aquí: la agrega el RPC `pay_scheduled_entry` al
+ * registrar el pago, con la cuenta que elige el usuario en ese momento.
  */
-function buildPostings(scheduled_id, { expense_account_id, payment_account_id, installment_amount, memo = null }, user_id = null) {
+function buildPostings(scheduled_id, { destination_account_id, installment_amount, memo = null }, user_id = null) {
   const amt = Number(installment_amount) || 0;
   return [
-    { scheduled_id, account_id: expense_account_id, debit: amt, credit: 0, memo, user_id },
-    { scheduled_id, account_id: payment_account_id, debit: 0, credit: amt, memo, user_id },
+    { scheduled_id, account_id: destination_account_id, debit: amt, credit: 0, memo, user_id },
   ];
 }
 
@@ -57,12 +58,11 @@ export async function createScheduledEntry({
   rrule = "FREQ=MONTHLY",
   merchant_id = null,
   description = null,
-  expense_account_id,
-  payment_account_id,
+  destination_account_id,
 }) {
   if (!name?.trim()) throw new Error("El nombre es obligatorio");
-  if (!expense_account_id || !payment_account_id) {
-    throw new Error("Faltan la cuenta de gasto o la cuenta que paga");
+  if (!destination_account_id) {
+    throw new Error("Falta la cuenta de destino (gasto o pasivo)");
   }
   if (!installment_amount || Number(installment_amount) <= 0) {
     throw new Error("El monto por cuota debe ser mayor a 0");
@@ -96,7 +96,7 @@ export async function createScheduledEntry({
 
   const { error: postErr } = await supabase
     .from("scheduled_postings")
-    .insert(buildPostings(entry.id, { expense_account_id, payment_account_id, installment_amount }, user_id));
+    .insert(buildPostings(entry.id, { destination_account_id, installment_amount }, user_id));
 
   if (postErr) {
     await supabase.from("scheduled_entries").delete().eq("id", entry.id);
@@ -120,8 +120,7 @@ export async function updateScheduledEntry(id, {
   rrule,
   merchant_id = null,
   description = null,
-  expense_account_id,
-  payment_account_id,
+  destination_account_id,
 }) {
   const { data: userData } = await supabase.auth.getUser();
   const user_id = userData?.user?.id ?? null;
@@ -153,7 +152,7 @@ export async function updateScheduledEntry(id, {
 
   const { error: insErr } = await supabase
     .from("scheduled_postings")
-    .insert(buildPostings(id, { expense_account_id, payment_account_id, installment_amount }, user_id));
+    .insert(buildPostings(id, { destination_account_id, installment_amount }, user_id));
 
   if (insErr) throw insErr;
 
@@ -173,61 +172,26 @@ export async function setScheduledActive(id, is_active) {
 }
 
 /**
- * Registra el pago de un gasto fijo: genera un journal_entry real + postings copiando
- * los scheduled_postings, incrementa completed_installments, avanza next_run_date según
- * el rrule, y desactiva el gasto si ya completó todas las cuotas.
+ * Registra el pago de un gasto/pago fijo de forma ATÓMICA vía el RPC
+ * `pay_scheduled_entry`: genera el asiento de partida doble (agregando la pata
+ * de la cuenta de pago elegida por el usuario), avanza la recurrencia y maneja
+ * las cuotas. El front no replica nada de la lógica contable.
+ *
+ * `from_account_id` (la cuenta desde la que se paga) la elige SIEMPRE el usuario.
+ * Devuelve { entry_id, amount, next_run_date, completed_installments, is_active }.
+ * El RPC es idempotente: reintentar la misma cuota lanza el código Postgres 23505.
  */
-export async function postScheduledEntry(scheduled_id, { entry_date } = {}) {
-  const { data: sched, error: schedErr } = await supabase
-    .from("scheduled_entries")
-    .select("*")
-    .eq("id", scheduled_id)
-    .single();
+export async function payScheduledEntry(scheduled_id, from_account_id, { entry_date = null } = {}) {
+  if (!from_account_id) throw new Error("Elegí la cuenta desde la que se paga");
 
-  if (schedErr) throw schedErr;
+  // OJO: no mandar p_entry_date = null. El RPC usa la fecha tal cual (sin coalesce),
+  // así que un null rompería el asiento. Omitirlo deja que aplique su default
+  // CURRENT_DATE; sólo lo incluimos si el usuario dio una fecha explícita.
+  const params = { p_id: scheduled_id, p_from_account_id: from_account_id };
+  if (entry_date) params.p_entry_date = entry_date;
 
-  const lines = await getScheduledPostings(scheduled_id);
-  if (!lines.length) throw new Error("El gasto fijo no tiene líneas configuradas");
+  const { data, error } = await supabase.rpc("pay_scheduled_entry", params);
 
-  const date = entry_date || new Date().toISOString().slice(0, 10);
-
-  // Genera el asiento real reutilizando el MISMO RPC atómico que el resto de
-  // movimientos: valida cuentas/moneda, exige que balancee e inserta cabecera
-  // y postings en una sola transacción del lado de Postgres.
-  const payload = {
-    entry_date: date,
-    description: sched.name,
-    merchant_id: sched.merchant_id ?? null,
-    status: "CLEARED",
-    currency_code: sched.currency_code,
-    postings: lines.map((l) => ({
-      account_id: String(l.account_id),
-      debit: Number(l.debit) || 0,
-      credit: Number(l.credit) || 0,
-      memo: l.memo ?? null,
-    })),
-  };
-
-  const { data: entryId, error: entryErr } = await supabase.rpc(
-    "create_journal_entry_with_postings",
-    { payload },
-  );
-
-  if (entryErr) throw entryErr;
-
-  const completed = (Number(sched.completed_installments) || 0) + 1;
-  const done = sched.total_installments != null && completed >= Number(sched.total_installments);
-
-  const { error: bumpErr } = await supabase
-    .from("scheduled_entries")
-    .update({
-      completed_installments: completed,
-      next_run_date: advanceByRRule(sched.next_run_date, sched.rrule),
-      is_active: !done,
-    })
-    .eq("id", scheduled_id);
-
-  if (bumpErr) throw bumpErr;
-
-  return entryId;
+  if (error) throw error;
+  return data;
 }

@@ -5,20 +5,24 @@ import {
   TrendingDown,
   TrendingUp,
   ArrowLeftRight,
+  ArrowRight,
   Receipt,
   Calendar,
   Pencil,
   Trash2,
   ChevronLeft,
   ChevronRight,
+  Download,
 } from "lucide-react";
 import { Sidebar } from "../../../components/Sidebar";
 import { supabase } from "../../../lib/supabaseClient";
 import { formatMoney } from "../../../lib/utils/money";
-import { getMovementDetail } from "../../../lib/services/movements.service";
+import { getRollingRange } from "../../../lib/utils/dates";
+import { toCsv, downloadCsv } from "../../../lib/utils/csv";
+import { getMovementDetail, listMovementsByRange } from "../../../lib/services/movements.service";
 import { useMovements, useUpdateMovement, useDeleteMovement } from "../hooks/useMovements";
 import { useTags } from "../hooks/useTags";
-import { useCreateMovement } from "../../dashboard/hooks/useCreateMovement";
+import { useCreateMovement, useReconocerGanancia } from "../../dashboard/hooks/useCreateMovement";
 import ModalNuevoMovimiento from "../../dashboard/components/ModalNuevoMovimiento";
 import { useToast } from "../../../components/ToastProvider";
 
@@ -54,6 +58,26 @@ const FILTERS = [
   { id: "ingreso", label: "Ingresos" },
   { id: "gasto", label: "Gastos" },
   { id: "transferencia", label: "Transferencias" },
+];
+
+// Rangos de exportación CSV (días móviles terminados hoy).
+const EXPORT_RANGES = [
+  { id: 7, label: "Semana" },
+  { id: 15, label: "Quincena" },
+  { id: 30, label: "Mes" },
+  { id: 90, label: "3 meses" },
+];
+
+const CSV_COLUMNS = [
+  { header: "Fecha", value: (r) => r.entry_date },
+  { header: "Tipo", value: (r) => r.tipo },
+  { header: "Descripción", value: (r) => r.description ?? "" },
+  { header: "Comercio", value: (r) => r.merchant_name ?? "" },
+  { header: "Origen", value: (r) => r.origen_name ?? "" },
+  { header: "Destino", value: (r) => r.destino_name ?? "" },
+  { header: "Monto", value: (r) => r.amount },
+  { header: "Moneda", value: (r) => r.currency_code ?? "" },
+  { header: "Etiquetas", value: (r) => (r.tags ?? []).map((t) => t.name).join("; ") },
 ];
 
 const handleLogout = () => {
@@ -104,6 +128,15 @@ function MovimientoCard({ mov, onEdit, onDelete, busy }) {
             </span>
           )}
         </div>
+        {mov.origen_name && mov.destino_name && (
+          <div className="flex items-center mt-1.5 min-w-0">
+            <span className="inline-flex items-center gap-1.5 text-caption bg-elevated border border-default rounded-md px-2 py-0.5 max-w-full">
+              <span className="truncate text-secondary">{mov.origen_name}</span>
+              <ArrowRight className="w-3 h-3 flex-shrink-0 text-muted" strokeWidth={2.25} />
+              <span className="truncate text-secondary">{mov.destino_name}</span>
+            </span>
+          </div>
+        )}
         {mov.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1.5">
             {mov.tags.map((t) => (
@@ -161,9 +194,12 @@ export default function Movimientos() {
   const [openModal, setOpenModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [exportDays, setExportDays] = useState(30);
+  const [exporting, setExporting] = useState(false);
 
   const { data: movimientos = [], isLoading, isError, error } = useMovements();
   const createMovement = useCreateMovement();
+  const reconocer = useReconocerGanancia();
   const updateMovement = useUpdateMovement();
   const deleteMovement = useDeleteMovement();
   const { data: allTags = [] } = useTags();
@@ -202,6 +238,7 @@ export default function Movimientos() {
 
   async function asyncHandleSave(movement) {
     try {
+      let successMsg;
       if (editing) {
         await updateMovement.mutateAsync({
           id: editing.id,
@@ -215,6 +252,16 @@ export default function Movimientos() {
           merchant_id: editing.merchant_id ?? null,
           tags: movement.tags,
         });
+        successMsg = "Movimiento actualizado";
+      } else if (movement.tipo === "reconocer") {
+        // Reclasificación pasivo → ingreso (no mueve dinero entre cuentas).
+        await reconocer.mutateAsync({
+          amount: movement.monto,
+          liability_account_id: movement.cuentaOrigenId,
+          income_account_id: movement.cuentaDestinoId,
+          description: movement.nombre,
+        });
+        successMsg = "Ganancia reconocida";
       } else {
         await createMovement.mutateAsync({
           entry_date: new Date().toISOString().slice(0, 10),
@@ -226,9 +273,10 @@ export default function Movimientos() {
           memo: movement.nombre,
           tags: movement.tags,
         });
+        successMsg = "Movimiento creado";
       }
       closeModal();
-      toast.success(editing ? "Movimiento actualizado" : "Movimiento creado");
+      toast.success(successMsg);
     } catch (e) {
       toast.error("Error al guardar el movimiento: " + (e.message || String(e)));
     }
@@ -267,6 +315,28 @@ export default function Movimientos() {
     });
   }
 
+  async function handleExport() {
+    const { from, to } = getRollingRange(exportDays);
+    setExporting(true);
+    try {
+      const rows = await listMovementsByRange(from, to);
+      if (rows.length === 0) {
+        toast.error("No hay movimientos en el rango seleccionado");
+        return;
+      }
+      // `to` es exclusivo (mañana); el último día incluido es to − 1.
+      const end = new Date(`${to}T00:00:00`);
+      end.setDate(end.getDate() - 1);
+      const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+      downloadCsv(`movimientos_${from}_a_${endStr}.csv`, toCsv(rows, CSV_COLUMNS));
+      toast.success(`Exportados ${rows.length} movimiento${rows.length === 1 ? "" : "s"}`);
+    } catch (e) {
+      toast.error("Error al exportar: " + (e?.message || String(e)));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="min-h-screen w-full text-primary">
       <Sidebar handleLogout={handleLogout} />
@@ -295,6 +365,30 @@ export default function Movimientos() {
                 placeholder="Buscar…"
                 className="bg-transparent border-0 outline-none flex-1 text-[12px] text-primary placeholder:text-faint"
               />
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <select
+                value={exportDays}
+                onChange={(e) => setExportDays(Number(e.target.value))}
+                aria-label="Rango de exportación"
+                className="bg-surface border border-default rounded-md px-2.5 py-2 text-[12px] text-primary outline-none focus:border-accent focus:shadow-focus transition-all duration-base [color-scheme:dark]"
+              >
+                {EXPORT_RANGES.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={exporting}
+                className="flex items-center gap-1.5 text-[12px] font-medium text-secondary bg-surface border border-default rounded-md px-3 py-2 hover:bg-elevated hover:text-primary transition-colors duration-base disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" strokeWidth={2.25} />
+                {exporting ? "Exportando…" : "CSV"}
+              </button>
             </div>
 
             <button
@@ -481,7 +575,7 @@ export default function Movimientos() {
           isOpen={openModal}
           onClose={closeModal}
           onSave={asyncHandleSave}
-          isSaving={createMovement.isPending || updateMovement.isPending}
+          isSaving={createMovement.isPending || updateMovement.isPending || reconocer.isPending}
           initial={editing}
         />
       </div>

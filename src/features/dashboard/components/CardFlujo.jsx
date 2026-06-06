@@ -44,16 +44,26 @@ export const CardFlujo = ({
     ? {
         iconBg: "bg-success/10",
         iconColor: "text-success",
-        chip: "bg-success/10 text-success border-success/30",
       }
     : {
         iconBg: "bg-danger/10",
         iconColor: "text-danger",
-        chip: "bg-danger/10 text-danger border-danger/30",
       };
 
   const showPct =
     typeof porcentaje === "number" && !Number.isNaN(porcentaje) && porcentaje !== 0;
+
+  // El chip de comparación refleja el CAMBIO (no la identidad de la tarjeta):
+  // flecha según el signo del %, y color según si el cambio es favorable
+  // (ingreso↑ o gasto↓ = verde; lo contrario = rojo).
+  const subio = showPct && porcentaje > 0;
+  const esBueno = isUp ? subio : !subio;
+  const ChipIcon = subio ? TrendingUp : TrendingDown;
+  const chipCls = !showPct
+    ? "bg-elevated text-muted border-default"
+    : esBueno
+      ? "bg-success/10 text-success border-success/30"
+      : "bg-danger/10 text-danger border-danger/30";
 
   return (
     <div className="card-gradient-border rounded-2xl p-5 animate-fade-up">
@@ -72,15 +82,23 @@ export const CardFlujo = ({
         {formatMoney(saldo, currency)}
       </div>
 
-      <div className="flex items-center gap-1.5">
-        <span
-          className={`text-[10px] font-semibold border px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1 ${semantic.chip}`}
-        >
-          <Icon className="w-3 h-3" strokeWidth={2.5} />
-          {showPct ? `${porcentaje > 0 ? "+" : ""}${porcentaje.toFixed(1)}%` : "—"}
-        </span>
-        <span className="text-caption text-muted">{descripcion}</span>
-      </div>
+      {(showPct || descripcion) && (
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`text-[10px] font-semibold border px-2 py-0.5 rounded-full uppercase tracking-wider inline-flex items-center gap-1 ${chipCls}`}
+          >
+            {showPct ? (
+              <>
+                <ChipIcon className="w-3 h-3" strokeWidth={2.5} />
+                {`${porcentaje > 0 ? "+" : ""}${porcentaje.toFixed(1)}%`}
+              </>
+            ) : (
+              "—"
+            )}
+          </span>
+          <span className="text-caption text-muted">{descripcion}</span>
+        </div>
+      )}
     </div>
   );
 };

@@ -25,8 +25,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const DEFAULT_FORM = {
   name: "",
   type: "SUBSCRIPTION",
-  expense_account_id: "",
-  payment_account_id: "",
+  destination_account_id: "",
   installment_amount: "",
   total_installments: "",
   total_amount: "",
@@ -55,8 +54,10 @@ export default function ModalGastoFijo({ isOpen, onClose, entry = null }) {
   const updateMutation = useUpdateScheduledEntry();
   const { data: postings = [] } = useScheduledPostings(isEdit ? entry.id : null);
 
+  // Destino de la plantilla: una cuenta de gasto, o un pasivo (préstamo) a reducir.
+  // La cuenta que paga ya no se define aquí: se elige al registrar cada pago.
   const expenseAccounts = accounts.filter((a) => a.type === "EXPENSE");
-  const paymentAccounts = accounts.filter((a) => a.type === "ASSET" || a.type === "LIABILITY");
+  const liabilityAccounts = accounts.filter((a) => a.type === "LIABILITY");
 
   // Reinicia el formulario al abrir (ajuste de estado en render).
   const [prevOpen, setPrevOpen] = useState(false);
@@ -68,8 +69,7 @@ export default function ModalGastoFijo({ isOpen, onClose, entry = null }) {
         ? {
             name: entry.name ?? "",
             type: entry.type ?? "SUBSCRIPTION",
-            expense_account_id: "",
-            payment_account_id: "",
+            destination_account_id: "",
             installment_amount: entry.installment_amount ?? "",
             total_installments: entry.total_installments ?? "",
             total_amount: entry.total_amount ?? "",
@@ -83,17 +83,16 @@ export default function ModalGastoFijo({ isOpen, onClose, entry = null }) {
   }
   if (!isOpen && prevOpen) setPrevOpen(false);
 
-  // Prefill de las cuentas cuando llegan los postings (sólo en edición).
-  // Es una sincronización legítima con datos async, por eso el setState va en efecto.
+  // Prefill de la cuenta destino cuando llegan los postings (sólo en edición).
+  // La plantilla tiene una sola pata (débito); es una sincronización legítima
+  // con datos async, por eso el setState va en efecto.
   useEffect(() => {
     if (!isOpen || !isEdit || !postings.length) return;
     const debit = postings.find((p) => Number(p.debit) > 0);
-    const credit = postings.find((p) => Number(p.credit) > 0);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm((f) => ({
       ...f,
-      expense_account_id: f.expense_account_id || String(debit?.account_id ?? ""),
-      payment_account_id: f.payment_account_id || String(credit?.account_id ?? ""),
+      destination_account_id: f.destination_account_id || String(debit?.account_id ?? ""),
     }));
   }, [postings, isOpen, isEdit]);
 
@@ -115,16 +114,16 @@ export default function ModalGastoFijo({ isOpen, onClose, entry = null }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
-    if (!form.name.trim() || !form.expense_account_id || !form.payment_account_id) {
-      setError("Completá nombre, cuenta de gasto y cuenta que paga");
+    if (!form.name.trim() || !form.destination_account_id) {
+      setError("Completá nombre y cuenta de destino");
       return;
     }
 
-    const expenseAcc = accounts.find((a) => String(a.id) === String(form.expense_account_id));
+    const destAcc = accounts.find((a) => String(a.id) === String(form.destination_account_id));
     const payload = {
       name: form.name,
       type: form.type,
-      currency_code: expenseAcc?.currency_code ?? "CRC",
+      currency_code: destAcc?.currency_code ?? "CRC",
       installment_amount: form.installment_amount,
       total_amount: form.total_amount === "" ? null : form.total_amount,
       total_installments: isSubscription || form.total_installments === "" ? null : form.total_installments,
@@ -132,8 +131,7 @@ export default function ModalGastoFijo({ isOpen, onClose, entry = null }) {
       start_date: form.start_date,
       rrule: form.rrule,
       description: form.description.trim() || null,
-      expense_account_id: Number(form.expense_account_id),
-      payment_account_id: Number(form.payment_account_id),
+      destination_account_id: Number(form.destination_account_id),
     };
 
     try {
@@ -215,35 +213,34 @@ export default function ModalGastoFijo({ isOpen, onClose, entry = null }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-eyebrow text-muted uppercase mb-2">Cuenta de gasto</label>
-              <select
-                value={form.expense_account_id}
-                onChange={(e) => setForm((f) => ({ ...f, expense_account_id: e.target.value }))}
-                className={`${inputCls} appearance-none`}
-                style={selectStyle}
-              >
-                <option value="" className="bg-surface">Seleccionar…</option>
-                {expenseAccounts.map((a) => (
-                  <option key={a.id} value={a.id} className="bg-surface">{a.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-eyebrow text-muted uppercase mb-2">Pagar desde</label>
-              <select
-                value={form.payment_account_id}
-                onChange={(e) => setForm((f) => ({ ...f, payment_account_id: e.target.value }))}
-                className={`${inputCls} appearance-none`}
-                style={selectStyle}
-              >
-                <option value="" className="bg-surface">Seleccionar…</option>
-                {paymentAccounts.map((a) => (
-                  <option key={a.id} value={a.id} className="bg-surface">{a.name}</option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-eyebrow text-muted uppercase mb-2">Cuenta de destino</label>
+            <select
+              value={form.destination_account_id}
+              onChange={(e) => setForm((f) => ({ ...f, destination_account_id: e.target.value }))}
+              className={`${inputCls} appearance-none`}
+              style={selectStyle}
+            >
+              <option value="" className="bg-surface">Seleccionar…</option>
+              {expenseAccounts.length > 0 && (
+                <optgroup label="Gastos" className="bg-surface">
+                  {expenseAccounts.map((a) => (
+                    <option key={a.id} value={a.id} className="bg-surface">{a.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {liabilityAccounts.length > 0 && (
+                <optgroup label="Pasivos" className="bg-surface">
+                  {liabilityAccounts.map((a) => (
+                    <option key={a.id} value={a.id} className="bg-surface">{a.name}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            <p className="text-caption text-muted mt-1.5">
+              El gasto, o el pasivo a reducir en un préstamo. La cuenta desde la que pagas
+              se elige al registrar cada pago.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

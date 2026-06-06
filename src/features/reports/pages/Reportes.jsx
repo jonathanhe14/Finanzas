@@ -1,5 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
 import Chart from "react-apexcharts";
 import { TrendingUp, TrendingDown, Wallet, PiggyBank, PieChart } from "lucide-react";
 import { Sidebar } from "../../../components/Sidebar";
@@ -69,14 +68,7 @@ function StatTile({ label, value, tone, Icon, hint }) {
 }
 
 export default function Reportes() {
-  const navigate = useNavigate();
   const [period, setPeriod] = useState(6);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data?.user) navigate("/login");
-    });
-  }, [navigate]);
 
   const { months, from, to } = useMemo(() => buildMonths(period), [period]);
 

@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { Plus, ChevronRight, ChevronLeft } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus } from "lucide-react";
 import { supabase } from "../../../lib/supabaseClient";
 import { Sidebar } from "../../../components/Sidebar";
 import { CardFlujo } from "../components/CardFlujo";
@@ -8,12 +7,14 @@ import { CardBalance } from "../components/CardBalance";
 import { CardUltimosMovimientos } from "../components/CardUltimosMovimientos";
 import { CardGastosCategoria } from "../components/CardGastosCategoria";
 import { CardPresupuesto } from "../components/CardPresupuesto";
+import { CardProximoPago } from "../components/CardProximoPago";
 import ModalNuevoMovimiento from "../components/ModalNuevoMovimiento";
 import { useDashboardReport } from "../hooks/useDashboardReport";
 import { useRecentEntries } from "../hooks/useRecentEntries";
-import { useCreateMovement } from "../hooks/useCreateMovement";
+import { useCreateMovement, useReconocerGanancia } from "../hooks/useCreateMovement";
 import { useAccountsList } from "../../accounts/hooks/useAccountsList";
 import { useMonthlyBudget, useExpenseSpent } from "../../budgets/hooks/useBudgets";
+import { useScheduledEntries } from "../../budgets/hooks/useScheduled";
 import { getMonthRange } from "../../../lib/utils/dates";
 import { useToast } from "../../../components/ToastProvider";
 
@@ -23,29 +24,28 @@ const handleLogout = () => {
 
 function Home() {
   const [openModal, setOpenModal] = useState(false);
-  const navigate = useNavigate();
   const createMovement = useCreateMovement();
+  const reconocer = useReconocerGanancia();
   const toast = useToast();
 
-  const now = new Date();
-  const [cursor, setCursor] = useState({
-    year: now.getFullYear(),
-    month: now.getMonth(),
-  });
-  const { from, to } = useMemo(
-    () => getMonthRange(cursor.year, cursor.month),
-    [cursor],
-  );
+  // Rango fijo del mes en curso. El reporte y los presupuestos se calculan
+  // sobre el mes actual; ya no hay navegación entre meses en el dashboard.
+  const { from, to } = useMemo(() => {
+    const now = new Date();
+    return getMonthRange(now.getFullYear(), now.getMonth());
+  }, []);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data?.user) navigate("/login");
-    });
-  }, [navigate]);
+  // Rango del mes anterior, para las comparaciones de flujo (gastos/ingresos).
+  const prev = useMemo(() => {
+    const now = new Date();
+    return getMonthRange(now.getFullYear(), now.getMonth() - 1);
+  }, []);
 
   const { data: dashboardData } = useDashboardReport(from, to);
+  const { data: prevDashboard } = useDashboardReport(prev.from, prev.to);
   const { data: recentEntries = [] } = useRecentEntries();
   const { data: accounts = [] } = useAccountsList();
+  const { data: scheduled = [] } = useScheduledEntries();
   const { data: budget } = useMonthlyBudget();
   const { data: spentMap = {} } = useExpenseSpent(from, to);
 
@@ -67,6 +67,21 @@ function Home() {
     );
   }, [byCurrency, activeCurrency]);
 
+  // Totales del mes anterior (misma moneda activa) y % de cambio.
+  const pdata = useMemo(() => {
+    const list = prevDashboard?.by_currency ?? [];
+    return list.find((c) => c.currency_code === activeCurrency) ?? null;
+  }, [prevDashboard, activeCurrency]);
+
+  const pctChange = (curr, base) => {
+    const c = Number(curr) || 0;
+    const p = Number(base) || 0;
+    if (p === 0) return 0; // sin base de comparación → la tarjeta muestra "—"
+    return ((c - p) / p) * 100;
+  };
+  const expensePct = pctChange(cdata.expense_total, pdata?.expense_total);
+  const incomePct = pctChange(cdata.income_total, pdata?.income_total);
+
   const expenseByCat = useMemo(
     () =>
       (dashboardData?.expense_by_category ?? []).filter(
@@ -74,33 +89,6 @@ function Home() {
       ),
     [dashboardData, activeCurrency],
   );
-
-  // Mes anterior (para la comparación %).
-  const prevRange = useMemo(() => {
-    const d = new Date(cursor.year, cursor.month - 1, 1);
-    return getMonthRange(d.getFullYear(), d.getMonth());
-  }, [cursor]);
-  const { data: prevDashboard } = useDashboardReport(prevRange.from, prevRange.to);
-  const pdata = useMemo(() => {
-    const list = prevDashboard?.by_currency ?? [];
-    return list.find((c) => c.currency_code === activeCurrency) ?? null;
-  }, [prevDashboard, activeCurrency]);
-
-  const pctChange = (curr, prev) => {
-    const c = Number(curr) || 0;
-    const p = Number(prev) || 0;
-    if (p === 0) return 0; // sin base de comparación → la tarjeta muestra "—"
-    return ((c - p) / p) * 100;
-  };
-  const expensePct = pctChange(cdata.expense_total, pdata?.expense_total);
-  const incomePct = pctChange(cdata.income_total, pdata?.income_total);
-
-  function shiftMonth(delta) {
-    setCursor((c) => {
-      const d = new Date(c.year, c.month + delta, 1);
-      return { year: d.getFullYear(), month: d.getMonth() };
-    });
-  }
 
   const presupuestos = useMemo(() => {
     if (!budget?.budget_line?.length) return [];
@@ -118,28 +106,34 @@ function Home() {
 
   async function asyncHandleSave(movement) {
     try {
-      await createMovement.mutateAsync({
-        entry_date: new Date().toISOString().slice(0, 10),
-        description: movement.nombre,
-        amount: movement.monto,
-        currency_code: "CRC",
-        debit_account_id: movement.cuentaDestinoId,
-        credit_account_id: movement.cuentaOrigenId,
-        memo: movement.nombre,
-        tags: movement.tags,
-      });
+      if (movement.tipo === "reconocer") {
+        // Reclasificación pasivo → ingreso (no mueve dinero entre cuentas).
+        await reconocer.mutateAsync({
+          amount: movement.monto,
+          liability_account_id: movement.cuentaOrigenId,
+          income_account_id: movement.cuentaDestinoId,
+          description: movement.nombre,
+        });
+      } else {
+        await createMovement.mutateAsync({
+          entry_date: new Date().toISOString().slice(0, 10),
+          description: movement.nombre,
+          amount: movement.monto,
+          currency_code: "CRC",
+          debit_account_id: movement.cuentaDestinoId,
+          credit_account_id: movement.cuentaOrigenId,
+          memo: movement.nombre,
+          tags: movement.tags,
+        });
+      }
       setOpenModal(false);
-      toast.success("Movimiento guardado");
+      toast.success(
+        movement.tipo === "reconocer" ? "Ganancia reconocida" : "Movimiento guardado",
+      );
     } catch (e) {
       toast.error("Error al guardar el movimiento: " + (e.message || String(e)));
     }
   }
-
-  const mesLabel = new Date(cursor.year, cursor.month, 1).toLocaleDateString(
-    "es-CR",
-    { month: "long", year: "numeric" },
-  );
-  const mesCapitalizado = mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1);
 
   return (
     <div className="min-h-screen w-full text-primary">
@@ -180,28 +174,6 @@ function Home() {
               </div>
             )}
 
-            <div className="flex items-center bg-surface border border-default rounded-md p-0.5">
-              <button
-                type="button"
-                onClick={() => shiftMonth(-1)}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:bg-elevated hover:text-primary transition-colors duration-base"
-                aria-label="Mes anterior"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <span className="num-chip px-2.5 text-[12px] text-primary font-medium capitalize">
-                {mesCapitalizado}
-              </span>
-              <button
-                type="button"
-                onClick={() => shiftMonth(1)}
-                className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:bg-elevated hover:text-primary transition-colors duration-base"
-                aria-label="Mes siguiente"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
             <button
               onClick={() => setOpenModal(true)}
               type="button"
@@ -220,19 +192,19 @@ function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <CardFlujo
               trending="down"
-              nombre="Gasto del mes"
+              nombre="Gastos"
               saldo={cdata.expense_total}
-              currency={activeCurrency}
               porcentaje={expensePct}
               descripcion="vs mes pasado"
+              currency={activeCurrency}
             />
             <CardFlujo
               trending="up"
-              nombre="Ingreso del mes"
+              nombre="Ingresos"
               saldo={cdata.income_total}
-              currency={activeCurrency}
               porcentaje={incomePct}
               descripcion="vs mes pasado"
+              currency={activeCurrency}
             />
             <CardBalance
               nombre="Balance disponible"
@@ -251,7 +223,7 @@ function Home() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <div className="lg:col-span-8 lg:row-span-2 min-h-[420px]">
+            <div className="lg:col-span-8 lg:row-span-3 min-h-[420px]">
               <CardUltimosMovimientos movimientos={recentEntries} />
             </div>
 
@@ -265,6 +237,10 @@ function Home() {
             <div className="lg:col-span-4">
               <CardPresupuesto presupuestos={presupuestos} />
             </div>
+
+            <div className="lg:col-span-4">
+              <CardProximoPago pagos={scheduled.slice(0, 3)} />
+            </div>
           </div>
         </main>
 
@@ -272,7 +248,7 @@ function Home() {
           isOpen={openModal}
           onClose={() => setOpenModal(false)}
           onSave={asyncHandleSave}
-          isSaving={createMovement.isPending}
+          isSaving={createMovement.isPending || reconocer.isPending}
         />
       </div>
     </div>

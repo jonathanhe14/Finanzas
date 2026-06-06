@@ -1,5 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo } from "react";
 import { Plus, Target } from "lucide-react";
 import { Sidebar } from "../../../components/Sidebar";
 import { supabase } from "../../../lib/supabaseClient";
@@ -24,16 +23,9 @@ function StatTile({ label, value, tone }) {
 }
 
 export default function Metas() {
-  const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [busyId, setBusyId] = useState(null);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data?.user) navigate("/login");
-    });
-  }, [navigate]);
 
   const { data: goals = [], isLoading, isError, error } = useGoals();
   const { data: balances = {} } = useAccountBalances();
