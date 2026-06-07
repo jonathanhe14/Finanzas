@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import Chart from "react-apexcharts";
 import { TrendingUp, TrendingDown, Wallet, PiggyBank, PieChart } from "lucide-react";
 import { Sidebar } from "../../../components/Sidebar";
+import { MobileMenuButton } from "../../../components/MobileMenuButton";
 import { supabase } from "../../../lib/supabaseClient";
 import { formatMoney } from "../../../lib/utils/money";
 import { useMonthlyTotals, useExpenseByCategory } from "../hooks/useReports";
@@ -10,13 +11,13 @@ import { ChartCard } from "../components/ChartCard";
 const handleLogout = () => supabase.auth.signOut();
 
 const COLORS = {
-  income: "#10B981",
+  income: "#22C55E",
   expense: "#F43F5E",
-  net: "#06B6D4",
+  net: "#10B981",
   grid: "rgba(255,255,255,0.06)",
-  fore: "#6B7280",
+  fore: "#6B7771",
 };
-const DONUT_PALETTE = ["#F43F5E", "#F59E0B", "#38BDF8", "#8B5CF6", "#06B6D4", "#10B981", "#9CA3B0"];
+const DONUT_PALETTE = ["#F43F5E", "#F59E0B", "#38BDF8", "#14B8A6", "#A78BFA", "#84CC16", "#9AA7A1"];
 
 const MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -179,7 +180,7 @@ export default function Reportes() {
     chart: { background: "transparent", foreColor: COLORS.fore, fontFamily: "Inter, sans-serif" },
     labels: donutData.map((d) => d.name),
     colors: DONUT_PALETTE,
-    stroke: { width: 2, colors: ["#11141B"] },
+    stroke: { width: 2, colors: ["#141A18"] },
     legend: { position: "bottom", labels: { colors: COLORS.fore }, fontSize: "12px", markers: { radius: 6 } },
     dataLabels: { enabled: true, formatter: (val) => Math.round(val) + "%", style: { fontSize: "11px" } },
     tooltip: { theme: "dark", y: { formatter: (v) => formatMoney(v, activeCurrency) } },
@@ -209,15 +210,18 @@ export default function Reportes() {
     <div className="min-h-screen w-full text-primary">
       <Sidebar handleLogout={handleLogout} />
 
-      <div className="ml-[64px] flex flex-col min-h-screen">
+      <div className="md:ml-[64px] flex flex-col min-h-screen">
         <header className="relative min-h-16 glass-panel border-b border-default flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-2.5 sm:py-0 sm:h-16 sticky top-0 z-30">
           <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent pointer-events-none" />
-          <div>
-            <h1 className="font-display text-h2 text-primary flex items-center gap-2">
-              Reportes
-              <span className="w-1 h-1 rounded-full bg-accent shadow-[0_0_6px_rgba(6,182,212,0.8)] animate-pulse-dot" />
-            </h1>
-            <p className="text-caption text-muted -mt-0.5">Tu situación financiera en el tiempo</p>
+          <div className="flex items-center gap-2.5">
+            <MobileMenuButton />
+            <div>
+              <h1 className="font-display text-h2 text-primary flex items-center gap-2">
+                Reportes
+                <span className="w-1 h-1 rounded-full bg-accent shadow-[0_0_6px_rgba(16,185,129,0.8)] animate-pulse-dot" />
+              </h1>
+              <p className="text-caption text-muted -mt-0.5">Tu situación financiera en el tiempo</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

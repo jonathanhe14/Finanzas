@@ -30,7 +30,7 @@ export function CardUltimosMovimientos({ movimientos = [] }) {
     <div className="card-glow-border bg-surface rounded-2xl shadow-card animate-fade-up flex flex-col overflow-hidden h-full">
       <div className="px-5 py-4 border-b border-default flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(6,182,212,0.6)] animate-pulse-dot" />
+          <span className="w-1.5 h-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse-dot" />
           <span className="text-h3 text-primary">Últimos movimientos</span>
         </div>
         <a className="text-caption text-muted hover:text-accent font-medium cursor-pointer transition-colors duration-base">

@@ -10,6 +10,7 @@ import Reportes from "./features/reports/pages/Reportes";
 import Metas from "./features/goals/pages/Metas";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./context/AuthContext";
+import { MobileNavProvider } from "./context/MobileNavContext";
 
 export default function App() {
   const { session, loading } = useAuth();
@@ -25,7 +26,8 @@ export default function App() {
   }
 
   return (
-    <Routes>
+    <MobileNavProvider>
+      <Routes>
       {/* Públicas. Un usuario autenticado en /login va directo a /home. */}
       <Route
         path="/login"
@@ -88,6 +90,7 @@ export default function App() {
         path="*"
         element={<Navigate to={session ? "/home" : "/login"} replace />}
       />
-    </Routes>
+      </Routes>
+    </MobileNavProvider>
   );
 }

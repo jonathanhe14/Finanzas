@@ -15,6 +15,7 @@ import {
   Download,
 } from "lucide-react";
 import { Sidebar } from "../../../components/Sidebar";
+import { MobileMenuButton } from "../../../components/MobileMenuButton";
 import { supabase } from "../../../lib/supabaseClient";
 import { formatMoney } from "../../../lib/utils/money";
 import { getRollingRange } from "../../../lib/utils/dates";
@@ -161,7 +162,7 @@ function MovimientoCard({ mov, onEdit, onDelete, busy }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-base">
+      <div className="flex items-center gap-1 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-base">
         <button
           type="button"
           onClick={onEdit}
@@ -341,22 +342,25 @@ export default function Movimientos() {
     <div className="min-h-screen w-full text-primary">
       <Sidebar handleLogout={handleLogout} />
 
-      <div className="ml-[64px] flex flex-col min-h-screen">
+      <div className="md:ml-[64px] flex flex-col min-h-screen">
         <header className="relative min-h-16 glass-panel border-b border-default flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-2.5 sm:py-0 sm:h-16 sticky top-0 z-30">
           <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent pointer-events-none" />
 
-          <div>
-            <h1 className="font-display text-h2 text-primary flex items-center gap-2">
-              Movimientos
-              <span className="w-1 h-1 rounded-full bg-accent shadow-[0_0_6px_rgba(6,182,212,0.8)] animate-pulse-dot" />
-            </h1>
-            <p className="text-caption text-muted -mt-0.5">
-              Historial detallado de tus movimientos
-            </p>
+          <div className="flex items-center gap-2.5">
+            <MobileMenuButton />
+            <div>
+              <h1 className="font-display text-h2 text-primary flex items-center gap-2">
+                Movimientos
+                <span className="w-1 h-1 rounded-full bg-accent shadow-[0_0_6px_rgba(16,185,129,0.8)] animate-pulse-dot" />
+              </h1>
+              <p className="text-caption text-muted -mt-0.5">
+                Historial detallado de tus movimientos
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center gap-2 bg-surface border border-default rounded-md px-3 py-1.5 w-44 focus-within:border-accent focus-within:shadow-focus transition-all duration-base">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+            <div className="flex items-center gap-2 bg-surface border border-default rounded-md px-3 py-1.5 flex-1 sm:flex-none sm:w-44 focus-within:border-accent focus-within:shadow-focus transition-all duration-base">
               <Search className="w-3.5 h-3.5 text-faint" />
               <input
                 type="text"

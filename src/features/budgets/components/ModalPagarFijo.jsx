@@ -57,14 +57,14 @@ export default function ModalPagarFijo({ isOpen, onClose, entry, onConfirm, savi
 
   return (
     <div
-      className={`fixed inset-0 z-[110] flex items-center justify-center transition-opacity duration-slow ${
+      className={`fixed inset-0 z-[110] flex items-end sm:items-center justify-center transition-opacity duration-slow ${
         isOpen ? "opacity-100" : "opacity-0"
       }`}
     >
       <div className="fixed inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
 
       <div
-        className={`relative z-[111] bg-surface rounded-3xl w-full max-w-[420px] mx-4 my-auto flex flex-col transition-all duration-slow ease-standard shadow-modal ${
+        className={`relative z-[111] bg-surface rounded-t-3xl sm:rounded-3xl w-full sm:max-w-[420px] mx-0 sm:mx-4 max-h-[92vh] sm:max-h-none pb-[env(safe-area-inset-bottom)] sm:pb-0 flex flex-col transition-all duration-slow ease-standard shadow-modal ${
           isOpen ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-[0.96]"
         }`}
       >

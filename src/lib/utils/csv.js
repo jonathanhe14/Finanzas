@@ -1,7 +1,12 @@
 // Utilidades mínimas para exportar datos a CSV y disparar la descarga.
 
 function escapeCell(value) {
-  const s = value == null ? "" : String(value);
+  let s = value == null ? "" : String(value);
+  // Mitiga inyección de fórmulas (CSV injection): Excel/Sheets interpretan como
+  // fórmula cualquier celda que empiece con = + - @ (o tab/CR). Como descripción,
+  // comercio y etiquetas son texto del usuario, anteponemos un apóstrofo para que
+  // se traten como texto plano al abrir el archivo.
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   // Envolver en comillas si contiene separador, comillas o saltos de línea.
   if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;

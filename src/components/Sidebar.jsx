@@ -1,23 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard,
-  ArrowRightLeft,
-  ChartLine,
-  BarChart3,
-  Target,
-  Wallet,
-  LogOut,
-} from "lucide-react";
-
-const MENU = [
-  { id: 1, name: "Dashboard", icon: LayoutDashboard, path: "/home" },
-  { id: 2, name: "Movimientos", icon: ArrowRightLeft, path: "/movimientos" },
-  { id: 3, name: "Presupuestos", icon: ChartLine, path: "/presupuesto" },
-  { id: 4, name: "Reportes", icon: BarChart3, path: "/reportes" },
-  { id: 5, name: "Metas", icon: Target, path: "/metas" },
-  { id: 6, name: "Cuentas", icon: Wallet, path: "/cuentas" },
-];
+import { LogOut } from "lucide-react";
+import { MENU } from "../lib/constants/navItems";
 
 export const Sidebar = ({ handleLogout }) => {
   const [expanded, setExpanded] = useState(false);
@@ -28,7 +12,7 @@ export const Sidebar = ({ handleLogout }) => {
     <aside
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
-      className={`fixed left-0 top-0 z-40 h-screen flex flex-col glass-panel border-r border-default transition-[width] duration-slow ease-standard select-none ${
+      className={`fixed left-0 top-0 z-40 h-screen hidden md:flex flex-col glass-panel border-r border-default transition-[width] duration-slow ease-standard select-none ${
         expanded ? "w-[224px]" : "w-[64px]"
       }`}
     >
@@ -82,7 +66,7 @@ export const Sidebar = ({ handleLogout }) => {
                 aria-hidden
                 className={`absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full transition-all duration-base ease-standard ${
                   isActive
-                    ? "bg-brand-gradient opacity-100 shadow-[0_0_12px_rgba(6,182,212,0.7)]"
+                    ? "bg-brand-gradient opacity-100 shadow-[0_0_12px_rgba(16,185,129,0.7)]"
                     : "bg-accent opacity-0"
                 }`}
               />
@@ -90,7 +74,7 @@ export const Sidebar = ({ handleLogout }) => {
               {isActive && !expanded && (
                 <span
                   aria-hidden
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-accent animate-pulse-dot shadow-[0_0_8px_rgba(6,182,212,0.8)]"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-accent animate-pulse-dot shadow-[0_0_8px_rgba(16,185,129,0.8)]"
                 />
               )}
               <div className="w-[48px] flex items-center justify-center flex-shrink-0">

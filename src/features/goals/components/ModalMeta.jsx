@@ -98,12 +98,12 @@ export default function ModalMeta({ isOpen, onClose, goal = null }) {
   }
 
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center transition-opacity duration-slow ${isOpen ? "opacity-100" : "opacity-0"}`}>
+    <div className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center transition-opacity duration-slow ${isOpen ? "opacity-100" : "opacity-0"}`}>
       <div className="fixed inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
 
       <form
         onSubmit={handleSubmit}
-        className={`relative z-[101] bg-surface rounded-3xl w-full max-w-[480px] mx-4 my-auto max-h-[90vh] flex flex-col transition-all duration-slow ease-standard shadow-modal ${isOpen ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-[0.96]"}`}
+        className={`relative z-[101] bg-surface rounded-t-3xl sm:rounded-3xl w-full sm:max-w-[480px] mx-0 sm:mx-4 max-h-[92vh] sm:max-h-[90vh] pb-[env(safe-area-inset-bottom)] sm:pb-0 flex flex-col transition-all duration-slow ease-standard shadow-modal ${isOpen ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-[0.96]"}`}
       >
         <div className="flex items-center justify-between px-6 pt-6 pb-5 border-b border-default">
           <div>

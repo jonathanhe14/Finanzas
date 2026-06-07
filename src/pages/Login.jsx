@@ -174,7 +174,7 @@ const Login = () => {
                   placeholder="••••••••"
                   autoComplete={activeTab === "login" ? "current-password" : "new-password"}
                   required
-                  minLength={6}
+                  minLength={activeTab === "register" ? 8 : 6}
                   className="w-full bg-sunken border border-default rounded-md pl-10 pr-10 py-2.5 text-body text-primary placeholder:text-faint focus:outline-none focus:border-accent focus:shadow-focus transition-all duration-base"
                 />
                 <button
@@ -263,7 +263,7 @@ function traducirError(msg) {
   if (lower.includes("user already registered"))
     return "Ya existe una cuenta con ese correo.";
   if (lower.includes("password should be"))
-    return "La contraseña debe tener al menos 6 caracteres.";
+    return "La contraseña debe tener al menos 8 caracteres.";
   return msg;
 }
 

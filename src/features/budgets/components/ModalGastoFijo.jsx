@@ -145,7 +145,7 @@ export default function ModalGastoFijo({ isOpen, onClose, entry = null }) {
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center transition-opacity duration-slow ${
+      className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center transition-opacity duration-slow ${
         isOpen ? "opacity-100" : "opacity-0"
       }`}
     >
@@ -153,7 +153,7 @@ export default function ModalGastoFijo({ isOpen, onClose, entry = null }) {
 
       <form
         onSubmit={handleSubmit}
-        className={`relative z-[101] bg-surface rounded-3xl w-full max-w-[480px] mx-4 my-auto max-h-[90vh] flex flex-col transition-all duration-slow ease-standard shadow-modal ${
+        className={`relative z-[101] bg-surface rounded-t-3xl sm:rounded-3xl w-full sm:max-w-[480px] mx-0 sm:mx-4 max-h-[92vh] sm:max-h-[90vh] pb-[env(safe-area-inset-bottom)] sm:pb-0 flex flex-col transition-all duration-slow ease-standard shadow-modal ${
           isOpen ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-[0.96]"
         }`}
       >

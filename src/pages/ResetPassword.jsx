@@ -16,8 +16,8 @@ export default function ResetPassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    if (password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres.");
+    if (password.length < 8) {
+      setError("La contraseña debe tener al menos 8 caracteres.");
       return;
     }
     if (password !== confirm) {
@@ -63,7 +63,7 @@ export default function ResetPassword() {
                   placeholder="••••••••"
                   autoComplete="new-password"
                   required
-                  minLength={6}
+                  minLength={8}
                   className="w-full bg-sunken border border-default rounded-md pl-10 pr-10 py-2.5 text-body text-primary placeholder:text-faint focus:outline-none focus:border-accent focus:shadow-focus transition-all duration-base"
                 />
                 <button
@@ -88,7 +88,7 @@ export default function ResetPassword() {
                   placeholder="••••••••"
                   autoComplete="new-password"
                   required
-                  minLength={6}
+                  minLength={8}
                   className="w-full bg-sunken border border-default rounded-md pl-10 pr-3.5 py-2.5 text-body text-primary placeholder:text-faint focus:outline-none focus:border-accent focus:shadow-focus transition-all duration-base"
                 />
               </div>
