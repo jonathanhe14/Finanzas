@@ -13,8 +13,6 @@ todo se guarda con contabilidad de partida doble sobre Supabase.
 
 > Videos en camino.
 
-Cuando estén listos van acá. Dejé los huecos preparados; solo hay que descomentar
-y apuntar al archivo.
 
 **La app web** (dashboard, registrar un movimiento, reportes)
 
